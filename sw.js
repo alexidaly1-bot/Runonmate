@@ -1,0 +1,30 @@
+/* Runonmate service worker: lets the app open and run with no internet once installed. */
+const CACHE = 'runonmate-v1';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  // never cache cloud AI calls
+  if (url.hostname === 'api.anthropic.com') return;
+  // the app page: network first so updates arrive, cached copy when offline
+  if (req.mode === 'navigate' || (url.origin === location.origin && /\/(index\.html)?$/.test(url.pathname))) {
+    e.respondWith(fetch(req).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put('./index.html', copy)); return r; })
+      .catch(() => caches.match('./index.html')));
+    return;
+  }
+  // everything else (icons, text-reader engine files): cache first
+  if (url.origin === location.origin || /(^|\.)jsdelivr\.net$|tessdata|projectnaptha/.test(url.hostname)) {
+    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
+      if (r.ok || r.type === 'opaque') { const copy = r.clone(); caches.open(CACHE).then(c => c.put(req, copy)); }
+      return r;
+    })));
+  }
+});

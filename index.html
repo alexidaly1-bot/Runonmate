@@ -1,0 +1,1677 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#fbf9f3" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1b1b1a" media="(prefers-color-scheme: dark)">
+<meta name="description" content="Runonmate: one continuous run-on notebook. Type, hand-write, draw or add images. Auto timestamps and tags.">
+<title>Runonmate</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23fbf9f3'/%3E%3Cpath d='M14 18h36M14 30h36M14 42h24' stroke='%231d1d1b' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M20 8v48' stroke='%23b5544a' stroke-width='3'/%3E%3C/svg%3E">
+<style>
+:root{
+  --paper:#fbf9f3; --ink:#1d1d1b; --muted:#615e57; --line:#e2ddd0; --margin:#d4a59c;
+  --chip:#f1ede3; --card:#ffffff; --desk:#e9e5dc; --page:#fffefb; --a4:210mm; --accent:#1f4e8c; --focus:#1f4e8c; --shadow:0 1px 2px rgba(0,0,0,.06);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#1b1b1a; --ink:#ecebe6; --muted:#a8a59d; --line:#3a3934; --margin:#6b4a44;
+    --chip:#2a2926; --card:#242422; --accent:#9dbcff; --focus:#9dbcff; --shadow:none; color-scheme:dark;
+    --desk:#121211; --page:#1f1f1d;
+  }
+}
+:root[data-theme="dark"]{
+  --desk:#121211; --page:#1f1f1d;
+  --paper:#1b1b1a; --ink:#ecebe6; --muted:#a8a59d; --line:#3a3934; --margin:#6b4a44;
+  --chip:#2a2926; --card:#242422; --accent:#9dbcff; --focus:#9dbcff; --shadow:none; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;height:100dvh;display:grid;grid-template-rows:auto 1fr auto;background:var(--paper);color:var(--ink);
+  font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent;overflow:hidden}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* toolbar */
+header.toolbar{display:flex;gap:2px;padding:4px max(6px,env(safe-area-inset-left)) 4px max(6px,env(safe-area-inset-right));
+  padding-top:max(4px,env(safe-area-inset-top));border-bottom:1px solid var(--line);background:var(--paper)}
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:none;border:2px solid transparent;
+  border-radius:10px;padding:4px 2px;min-height:52px;font-size:11.5px;line-height:1.15;white-space:nowrap}
+.tb:hover{background:var(--chip)}
+.tb[aria-pressed="true"]{border-color:var(--ink);background:var(--chip);font-weight:600}
+.tb .long{display:none}
+@media (min-width:640px){
+  .tb{flex-direction:row;gap:8px;font-size:14px}
+  .tb .long{display:inline}.tb .short{display:none}
+}
+
+/* layout */
+#wrap{display:flex;min-height:0;position:relative}
+#scroller{flex:1;background:var(--desk);overflow-y:auto;overflow-x:hidden;overflow-anchor:none;overscroll-behavior:contain;min-width:0}
+.feed{width:100%;max-width:var(--a4);min-height:100%;margin:0 auto;padding:6px 14px 40px;background:var(--page);box-shadow:0 0 0 1px var(--line),0 2px 12px rgba(0,0,0,.08)}
+@media (min-width:600px){.feed{padding:10px 30px 48px}}
+@media (min-width:860px){#scroller{padding:0 16px}}
+.sentinel{height:1px}
+
+/* notebook */
+.day{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:13.5px;font-weight:600;margin:20px 0 6px;letter-spacing:.01em}
+.day::before{content:"";width:2.6rem;border-top:1px solid var(--muted);opacity:.6}
+.day::after{content:"";flex:1;border-top:1px solid var(--line)}
+.entry{display:grid;grid-template-columns:3.3rem minmax(0,1fr);column-gap:12px;position:relative}
+.ts{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px;text-align:right;padding:9px 9px 6px 0;border-right:2px solid var(--margin)}
+.body{padding:6px 0 8px;min-width:0}
+.text{white-space:pre-wrap;overflow-wrap:anywhere}
+.media{margin:2px 0 4px}
+.media img{display:block;max-width:100%;height:auto;border-radius:6px;border:1px solid var(--line);background:#fff}
+.media img.ink{max-width:min(100%,640px)}
+.media img.notloaded{background:repeating-linear-gradient(45deg,var(--chip),var(--chip) 8px,transparent 8px,transparent 16px)}
+.found{font-size:13.5px;color:var(--muted);margin:2px 0}
+.found summary{cursor:pointer;width:max-content}
+.found div{white-space:pre-wrap;overflow-wrap:anywhere;border-left:2px solid var(--line);padding-left:8px;margin-top:2px}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;font-size:13px}
+.tag{border:1px solid var(--line);background:var(--chip);border-radius:999px;padding:2px 10px;min-height:30px;font-size:13px;line-height:1.2}
+.tag:hover{border-color:var(--ink)}
+.tag[aria-pressed="true"]{border:2px solid var(--ink);font-weight:700}
+.status{color:var(--muted);font-size:12.5px}
+.edited{color:var(--muted);font-size:12px;font-style:italic}
+.editbtn{margin-left:auto;display:inline-flex;align-items:center;gap:4px;border:1px solid transparent;background:none;border-radius:8px;
+  padding:3px 8px;min-height:30px;color:var(--muted);font-size:13px}
+.editbtn:hover{border-color:var(--line);color:var(--ink)}
+.editbtn svg.i{width:16px;height:16px}
+.why{font-size:12.5px;color:var(--muted);margin-top:2px}
+.empty{color:var(--muted);text-align:center;padding:48px 16px;max-width:420px;margin:0 auto}
+
+/* cards view */
+.feed.cards .entry{display:block;background:var(--page);border:1px solid var(--line);border-radius:12px;padding:8px 14px 8px;margin:12px 0;box-shadow:var(--shadow)}
+.feed.cards .ts{border:0;text-align:left;padding:2px 0 0;font-weight:600}
+.feed.cards .body{padding-top:2px}
+
+/* editor */
+.editor{display:flex;flex-direction:column;gap:10px;padding:8px 0 12px}
+.editor label{font-size:13px;font-weight:600;color:var(--muted)}
+.editor textarea,.field{width:100%;border:1px solid var(--line);border-radius:10px;background:var(--card);padding:9px 11px;resize:none}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 14px;min-height:40px;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--ink)}
+.btn.primary{background:var(--ink);color:var(--paper);border-color:var(--ink);font-weight:600}
+.btn.danger{border-style:dashed}
+.btn svg.i{width:18px;height:18px}
+.tagedit{display:inline-flex;align-items:center;border:1px solid var(--line);background:var(--chip);border-radius:999px;overflow:hidden}
+.tagedit button{background:none;border:0;padding:4px 8px;min-height:34px;font-size:13.5px}
+.tagedit .x{border-left:1px solid var(--line);padding:4px 10px}
+.tagedit input{border:0;background:var(--card);padding:4px 8px;width:9em;min-height:34px}
+.src{font-size:11px;color:var(--muted);margin-left:2px}
+
+/* composer */
+footer.composer{display:flex;gap:8px;align-items:flex-end;padding:8px max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left));
+  border-top:1px solid var(--line);background:var(--paper)}
+footer.composer .inner{display:flex;gap:8px;align-items:flex-end;width:100%;max-width:var(--a4);margin:0 auto}
+#composer{flex:1;min-height:46px;max-height:40vh;resize:none;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:10px 12px;line-height:1.4;overflow-y:auto}
+#addBtn{min-height:46px}
+
+/* panel */
+#panel{width:300px;flex:none;border-right:1px solid var(--line);overflow-y:auto;padding:12px;background:var(--paper);display:none}
+#panel.open{display:block}
+#panel h2{font-size:14px;margin:14px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.search{display:flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:2px 4px 2px 10px}
+.search input{flex:1;border:0;background:none;padding:8px 0;min-width:0}
+.search input:focus{outline:none}
+.search:focus-within{outline:3px solid var(--focus);outline-offset:1px}
+.iconbtn{background:none;border:0;border-radius:8px;min-width:38px;min-height:38px;display:inline-flex;align-items:center;justify-content:center}
+.iconbtn:hover{background:var(--chip)}
+.hint{font-size:12.5px;color:var(--muted);margin:6px 2px}
+#tagList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.tagrow{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;background:none;border:2px solid transparent;border-radius:8px;padding:6px 8px;text-align:left;min-height:40px}
+.tagrow:hover{background:var(--chip)}
+.tagrow[aria-pressed="true"]{border-color:var(--ink);font-weight:700;background:var(--chip)}
+.tagrow .n{font-variant-numeric:tabular-nums;color:var(--muted);font-size:13px}
+#panelResults{display:none;margin-top:12px;width:100%;justify-content:center}
+#backdrop{display:none}
+@media (max-width:819px){
+  #panel{display:block;position:fixed;z-index:30;top:0;bottom:0;left:0;width:min(88vw,360px);transform:translateX(-102%);transition:transform .18s ease;
+    box-shadow:4px 0 18px rgba(0,0,0,.18);padding-top:max(12px,env(safe-area-inset-top))}
+  #panel.open{transform:none}
+  #panel:not(.open){visibility:hidden;transition:transform .18s ease,visibility 0s .18s}
+  #backdrop.show{display:block;position:fixed;inset:0;z-index:29;background:rgba(0,0,0,.28)}
+  #panelResults{display:flex}
+}
+
+/* filter bar */
+#filterbar{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px dashed var(--muted);padding:8px 14px}
+#filterbar .inner{max-width:var(--a4);margin:0 auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
+#fbText{font-weight:600}
+.fchip{display:inline-flex;align-items:center;gap:4px;border:2px solid var(--ink);border-radius:999px;padding:1px 4px 1px 10px;background:var(--chip);font-size:13.5px}
+.fchip button{background:none;border:0;min-width:28px;min-height:28px;border-radius:999px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{background:var(--card);border:0;padding:5px 10px;min-height:34px;display:inline-flex;align-items:center;gap:5px;font-size:13.5px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper);font-weight:700}
+.seg svg.i{width:16px;height:16px}
+
+/* dialogs */
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);padding:0;max-width:min(560px,calc(100vw - 24px));width:100%}
+dialog::backdrop{background:rgba(0,0,0,.35)}
+.dlg-h{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--paper);z-index:1}
+.dlg-h h2{margin:0;font-size:18px}
+.dlg-b{padding:8px 16px 18px;max-height:calc(100dvh - 120px);overflow-y:auto}
+.dlg-b h3{font-size:15px;margin:18px 0 6px}
+.dlg-b p{margin:6px 0}
+.small{font-size:13.5px;color:var(--muted)}
+.check{display:flex;gap:10px;align-items:flex-start;margin:8px 0}
+.check input{width:22px;height:22px;margin-top:1px;flex:none}
+.privacy{border:1px solid var(--line);border-left:4px solid var(--ink);border-radius:8px;padding:8px 12px;background:var(--card);font-size:14px}
+.imgchoices{display:flex;flex-direction:column;gap:10px;padding:16px}
+.imgchoices .btn{justify-content:flex-start;min-height:52px;font-size:16px}
+
+/* drawing */
+#drawDlg{max-width:none;max-height:none;width:100vw;height:100dvh;margin:0;border:0;border-radius:0}
+#drawDlg[open]{display:grid;grid-template-rows:auto 1fr}
+.dtools{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:6px max(8px,env(safe-area-inset-left));padding-top:max(6px,env(safe-area-inset-top));border-bottom:1px solid var(--line);background:var(--paper)}
+.dtools .spacer{flex:1}
+.dtools .btn{min-height:40px;padding:5px 10px;font-size:14px}
+.swatch{width:14px;height:14px;border-radius:50%;display:inline-block;border:1px solid var(--muted)}
+#drawWrap{overflow:auto;background:#e9e6de;position:relative}
+#drawCanvas{display:block;background:#fff;box-shadow:0 1px 8px rgba(0,0,0,.15);touch-action:none;margin:0 auto;cursor:crosshair}
+#pressureNote{font-size:12px;color:var(--muted)}
+
+/* toast */
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:10px;
+  font-size:14px;z-index:50;max-width:calc(100vw - 32px);box-shadow:0 4px 16px rgba(0,0,0,.25);display:none}
+#toast.show{display:block}
+
+/* drag & drop */
+#scroller.dropping{outline:3px dashed var(--ink);outline-offset:-8px}
+
+/* print / PDF */
+#print{display:none}
+@media print{
+  @page{size:A4;margin:14mm}
+  html,body{height:auto;overflow:visible;display:block;background:#fff;color:#000}
+  body>*:not(#print){display:none!important}
+  #print{display:block;font:11pt/1.45 Georgia,"Times New Roman",serif;color:#000}
+  #print h1{font-size:18pt;margin:0 0 2mm}
+  #print .pmeta{font-size:9.5pt;color:#444;margin-bottom:6mm}
+  #print h2{font-size:12.5pt;border-top:1px solid #999;padding-top:3mm;margin:7mm 0 2mm;break-after:avoid}
+  #print .pe{display:grid;grid-template-columns:14mm 1fr;gap:4mm;margin:0 0 3.5mm;break-inside:avoid}
+  #print .pt{font-family:system-ui,sans-serif;font-size:9.5pt;color:#333;border-right:1px solid #999;padding-right:2mm;text-align:right}
+  #print .px{white-space:pre-wrap;overflow-wrap:anywhere}
+  #print img{max-width:100%;max-height:120mm;border:1px solid #ccc;display:block;margin:1mm 0}
+  #print .pf{font-size:9.5pt;color:#333;border-left:2px solid #bbb;padding-left:2mm;white-space:pre-wrap}
+  #print .pg{font-family:system-ui,sans-serif;font-size:9pt;color:#333;margin-top:1mm}
+}
+</style>
+</head>
+<body>
+<header class="toolbar" role="toolbar" aria-label="Notebook tools">
+  <button class="tb" id="tbText" aria-label="Add Text">
+    <svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/><path d="M18 14v6M15 17h6"/></svg>
+    <span class="short">Text</span><span class="long">Add Text</span></button>
+  <button class="tb" id="tbDraw" aria-label="Add Hand-write or Drawing">
+    <svg class="i" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L9 19l-5 1 1-5z"/><path d="M13.5 6.5l4 4"/></svg>
+    <span class="short">Draw</span><span class="long">Hand-write / Draw</span></button>
+  <button class="tb" id="tbImage" aria-label="Add Image">
+    <svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>
+    <span class="short">Image</span><span class="long">Add Image</span></button>
+  <button class="tb" id="tbSearch" aria-label="Search and Filter" aria-pressed="false" aria-controls="panel">
+    <svg class="i" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+    <span class="short">Search</span><span class="long">Search / Filter</span></button>
+  <button class="tb" id="tbOrder" aria-label="Timeline Order">
+    <svg class="i" viewBox="0 0 24 24"><path d="M7 4v16M3.5 16.5L7 20l3.5-3.5"/><path d="M14 6h7M14 11h5M14 16h3"/></svg>
+    <span id="orderShort" class="short">Oldest↑</span><span id="orderLong" class="long">Oldest at top</span></button>
+  <button class="tb" id="tbSettings" aria-label="Settings">
+    <svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+    <span class="short">Settings</span><span class="long">Settings</span></button>
+</header>
+
+<div id="wrap">
+  <aside id="panel" aria-label="Search and tags">
+    <div class="search">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>
+      <label for="q" class="sr">Search notebook</label>
+      <input id="q" type="search" placeholder="Search words or meaning…" autocomplete="off" enterkeyhint="search">
+      <button class="iconbtn" id="qClear" aria-label="Clear search" hidden>✕</button>
+    </div>
+    <p class="hint">Finds related words too, e.g. “couch” also finds sofa.</p>
+    <h2 id="tagsHead">Tags</h2>
+    <ul id="tagList" aria-labelledby="tagsHead"></ul>
+    <button class="btn primary" id="panelResults">Show results</button>
+  </aside>
+  <div id="backdrop"></div>
+  <main id="scroller" tabindex="-1" aria-label="Notebook">
+    <div id="filterbar" hidden>
+      <div class="inner">
+        <span aria-hidden="true">🔍</span><span id="fbText"></span><span id="fbChips" class="row"></span>
+        <div class="seg" role="group" aria-label="Show results as">
+          <button data-view="scroll" aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Scroll</button>
+          <button data-view="cards" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/></svg>Cards</button>
+        </div>
+        <button class="btn" id="fbClear" style="min-height:34px;padding:4px 10px">✕ Clear filter</button>
+      </div>
+    </div>
+    <div class="sentinel" id="topS"></div>
+    <div class="feed" id="feed" aria-live="polite"></div>
+    <div class="sentinel" id="botS"></div>
+  </main>
+</div>
+
+<footer class="composer">
+  <div class="inner">
+    <label for="composer" class="sr">New text entry</label>
+    <textarea id="composer" rows="1" placeholder="Write something…" enterkeyhint="enter"></textarea>
+    <button class="btn primary" id="addBtn" aria-label="Add entry">
+      <svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+  </div>
+</footer>
+
+<!-- image source dialog -->
+<dialog id="imgDlg" aria-labelledby="imgDlgH">
+  <div class="dlg-h"><h2 id="imgDlgH">Add image</h2><button class="iconbtn" data-close aria-label="Close">✕</button></div>
+  <div class="imgchoices">
+    <button class="btn" id="pickPhotos"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>Photos &amp; screenshots</button>
+    <button class="btn" id="pickCamera"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Take a photo</button>
+    <p class="small" style="margin:0">Tip: on a Chromebook you can also paste a screenshot (Ctrl+V) or drag an image onto the notebook.</p>
+  </div>
+</dialog>
+<input type="file" id="fileInput" accept="image/*" multiple hidden>
+<input type="file" id="camInput" accept="image/*" capture="environment" hidden>
+<input type="file" id="replaceInput" accept="image/*" hidden>
+
+<!-- drawing dialog -->
+<dialog id="drawDlg" aria-label="Hand-write or draw">
+  <div class="dtools">
+    <div class="seg" role="group" aria-label="Tool">
+      <button id="toolPen" aria-pressed="true"><svg class="i" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L9 19l-5 1 1-5z"/></svg>Pen</button>
+      <button id="toolEraser" aria-pressed="false"><svg class="i" viewBox="0 0 24 24"><path d="M8 20h12M5 15l8-8 6 6-6 6H9z"/></svg>Eraser</button>
+    </div>
+    <div class="seg" role="group" aria-label="Pen size">
+      <button data-size="s" aria-pressed="false">Thin</button>
+      <button data-size="m" aria-pressed="true">Medium</button>
+      <button data-size="l" aria-pressed="false">Thick</button>
+    </div>
+    <div class="seg" role="group" aria-label="Ink colour">
+      <button data-colour="#1d1d1b" aria-pressed="true"><span class="swatch" style="background:#1d1d1b"></span>Black</button>
+      <button data-colour="#1f4e8c" aria-pressed="false"><span class="swatch" style="background:#1f4e8c"></span>Blue</button>
+      <button data-colour="#b3261e" aria-pressed="false"><span class="swatch" style="background:#b3261e"></span>Red</button>
+    </div>
+    <button class="btn" id="drawUndo"><svg class="i" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>Undo</button>
+    <button class="btn" id="drawClear">Clear</button>
+    <button class="btn" id="drawMore">+ More room</button>
+    <span id="pressureNote"></span>
+    <span class="spacer"></span>
+    <button class="btn" id="drawCancel">Cancel</button>
+    <button class="btn primary" id="drawSave">Save</button>
+  </div>
+  <div id="drawWrap"><canvas id="drawCanvas"></canvas></div>
+</dialog>
+
+<!-- settings dialog -->
+<dialog id="setDlg" aria-labelledby="setDlgH">
+  <div class="dlg-h"><h2 id="setDlgH">Settings</h2><button class="iconbtn" data-close aria-label="Close">✕</button></div>
+  <div class="dlg-b">
+    <h3>Export</h3>
+    <p class="small">The whole notebook, with dates, times and tags.</p>
+    <div class="row">
+      <button class="btn" id="expPdf"><svg class="i" viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/></svg>Export PDF</button>
+      <button class="btn" id="expMd"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Export Markdown</button>
+    </div>
+    <p class="small">PDF: choose <b>Save as PDF</b> as the printer.</p>
+
+    <h3>AI tagging</h3>
+    <p class="small">Every entry is read and tagged automatically in the background.</p>
+    <p class="small" id="aiStatus"></p>
+    <div class="row">
+      <button class="btn" id="ocrPrefetch">Download text reader for offline use</button>
+      <button class="btn" id="reanalyse">Re-analyse all entries</button>
+    </div>
+
+    <h3>Optional cloud AI</h3>
+    <label class="check"><input type="checkbox" id="cloudOn"><span>Use cloud AI (Claude) for better tags and hand-writing reading. Needs internet and your own Anthropic API key. Without it, everything runs on this device.</span></label>
+    <div id="cloudBox">
+      <label for="apiKey" class="small">Anthropic API key</label>
+      <div class="row" style="flex-wrap:nowrap">
+        <input id="apiKey" class="field" type="password" autocomplete="off" spellcheck="false" placeholder="sk-ant-…">
+        <button class="btn" id="keyShow" aria-label="Show key">Show</button>
+      </div>
+      <label for="model" class="small" style="display:block;margin-top:8px">Model</label>
+      <select id="model" class="field">
+        <option value="claude-opus-5-5">Claude Opus 5.5 (best)</option>
+        <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
+        <option value="claude-haiku-5-5">Claude Haiku 5.5 (cheapest, fastest)</option>
+      </select>
+      <div class="row" style="margin-top:8px"><button class="btn" id="keyTest">Test key</button><span class="small" id="keyResult"></span></div>
+    </div>
+
+    <h3>Privacy</h3>
+    <div class="privacy">🔒 Your notes are saved only on this device (in the browser’s storage). Nothing is uploaded.
+      <br>The only exception: if you turn on <b>cloud AI</b>, each new or edited entry (its text, drawing or image) and your searches are sent to Anthropic to be tagged. Turn it off and nothing leaves the device.
+      <br>The text reader downloads once from the internet; your notes are never sent with it.</div>
+
+    <h3>Storage</h3>
+    <p class="small" id="storageInfo">…</p>
+  </div>
+</dialog>
+
+<div id="toast" role="status" aria-live="polite"></div>
+<div id="print" aria-hidden="true"></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   Runonmate – one continuous run-on notebook. Single file, offline-first.
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 9);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const CHUNK = 40;
+const WIDE = () => matchMedia('(min-width: 820px)').matches;
+
+/* ---------------- settings ---------------- */
+const SKEY = 'runonmate.settings.v1';
+const settings = Object.assign(
+  { order: 'asc', view: 'scroll', cloudOn: false, apiKey: '', model: 'claude-opus-5-5', panelWide: true },
+  (() => { try { return JSON.parse(localStorage.getItem(SKEY)) || {}; } catch { return {}; } })()
+);
+function saveSettings() { try { localStorage.setItem(SKEY, JSON.stringify(settings)); } catch {} }
+
+/* ---------------- toast ---------------- */
+let toastT;
+function toast(msg, ms = 2600) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), ms);
+}
+
+/* ---------------- IndexedDB ---------------- */
+const DB = {
+  db: null,
+  open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('runonmate', 1);
+      r.onupgradeneeded = () => {
+        const d = r.result;
+        if (!d.objectStoreNames.contains('entries')) d.createObjectStore('entries', { keyPath: 'id' });
+        if (!d.objectStoreNames.contains('blobs')) d.createObjectStore('blobs', { keyPath: 'id' });
+      };
+      r.onsuccess = () => { this.db = r.result; res(); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  tx(store, mode, fn) {
+    return new Promise((res, rej) => {
+      const t = this.db.transaction(store, mode), s = t.objectStore(store);
+      let out; const r = fn(s);
+      if (r) r.onsuccess = () => { out = r.result; };
+      t.oncomplete = () => res(out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+    });
+  },
+  all() { return this.tx('entries', 'readonly', s => s.getAll()); },
+  put(e) {
+    const clean = {}; for (const k in e) if (k[0] !== '_') clean[k] = e[k];
+    return this.tx('entries', 'readwrite', s => s.put(clean));
+  },
+  del(id) { return this.tx('entries', 'readwrite', s => s.delete(id)); },
+  putBlob(id, blob) { return this.tx('blobs', 'readwrite', s => s.put({ id, blob })); },
+  async getBlob(id) { if (!id) return null; const r = await this.tx('blobs', 'readonly', s => s.get(id)); return r ? r.blob : null; },
+  delBlob(id) { return id ? this.tx('blobs', 'readwrite', s => s.delete(id)) : Promise.resolve(); }
+};
+
+/* ---------------- dates ---------------- */
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const pad2 = n => String(n).padStart(2, '0');
+const dayKey = ts => { const d = new Date(ts); return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); };
+const dayLabel = ts => { const d = new Date(ts); return `${DAYS[d.getDay()]} ${d.getDate()} ${MONS[d.getMonth()]} ${d.getFullYear()}`; };
+const shortDay = ts => { const d = new Date(ts); return `${DAYS[d.getDay()].slice(0,3)} ${d.getDate()} ${MONS[d.getMonth()]} ${d.getFullYear()}`; };
+const hhmm = ts => { const d = new Date(ts); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); };
+
+/* =====================================================================
+   On-device language analysis (topics, keywords, related meanings)
+   ===================================================================== */
+const STOP = new Set(`a about above after again against all also am an and any are aren't as at be because been before being below between both but by can can't cannot could couldn't did didn't do does doesn't doing don't down during each few for from further get gets got gotta had hadn't has hasn't have haven't having he he'd he'll he's her here here's hers herself him himself his how how's i i'd i'll i'm i've if in into is isn't it it's its itself just let's like me might more most much must mustn't my myself need needs needed no nor not now of off on once only or other ought our ours ourselves out over own really same she she'd she'll she's should shouldn't so some such than that that's the their theirs them themselves then there there's these they they'd they'll they're they've thing things think thought this those through to too today tomorrow under until up upon us very via was wasn't we we'd we'll we're we've were weren't what what's when when's where where's which while who who's whom why why's will with won't would wouldn't yeah yes yep nope ok okay you you'd you'll you're you've your yours yourself yourselves maybe still even ever every lot lots bit going gonna wanna want wanted wants make made makes making take took taking one two three first last next new good great nice bad well back way day days time times week weeks year years morning afternoon tonight night yesterday around actually probably definitely anyway though although already always never sometimes something anything everything nothing someone anyone everyone done went come came coming see saw seen look looked looking said say says tell told know knew known feel felt put keep kept left right little big sure thanks thank please hey hi hello oh um uh hmm etc via per am pm also another use used using try tried trying start started getting give gave let much many lot quite pretty kind sort stuff bits else ago soon later able monday tuesday wednesday thursday friday saturday sunday mon tue wed thu fri sat sun january february march april june july august september october november december jan feb mar apr jun jul aug sep sept oct nov dec weekend wide deep tall long short high low small large huge tiny bought picked call called offer offered sent send found find asked ask spoke talked heard via cheers lol wow`.split(/\s+/));
+
+function tokenize(text) {
+  return (String(text || '').toLowerCase().replace(/[’‘`]/g, "'").match(/[\p{L}\p{N}][\p{L}\p{N}'-]*/gu) || [])
+    .map(w => w.replace(/^'+|'+$/g, '').replace(/-+$/, ''))
+    .filter(Boolean);
+}
+function stem(w) {
+  w = w.toLowerCase().replace(/'s$/, '').replace(/'/g, '');
+  if (w.length <= 3 || /\d/.test(w)) return w;
+  if (/ies$/.test(w) && w.length > 4) w = w.slice(0, -3) + 'y';
+  else if (/(ss|us|is)$/.test(w)) { /* keep */ }
+  else if (/(ches|shes|xes|zes|sses)$/.test(w)) w = w.slice(0, -2);
+  else if (/s$/.test(w)) w = w.slice(0, -1);
+  if (/ing$/.test(w) && w.length > 5) { w = w.slice(0, -3); if (/(.)\1$/.test(w) && !/(ll|ss|zz)$/.test(w)) w = w.slice(0, -1); }
+  else if (/ed$/.test(w) && !/eed$/.test(w) && w.length > 4) { w = w.slice(0, -2); if (/(.)\1$/.test(w) && !/(ll|ss|zz)$/.test(w)) w = w.slice(0, -1); }
+  else if (/ly$/.test(w) && w.length > 5) w = w.slice(0, -2);
+  if (/e$/.test(w) && w.length > 4) w = w.slice(0, -1);
+  return w;
+}
+
+/* Topic lexicon (Australian English). Topic name = tag. */
+const TOPICS = {
+  work: 'work, job, jobs, client, clients, customer, customers, quote, quotes, quoted, booking, booked, deadline, meeting, project, task, tasks, business, contract, deliver, delivery, pickup, pick-up, appointment, airtasker, offer, enquiry, enquiries, studio, workshop, commission, order, orders, hours, roster, shift',
+  money: 'money, pay, paid, paying, payment, payments, invoice, invoices, invoiced, bill, bills, cost, costs, price, prices, pricing, budget, bank, cash, tax, gst, expense, expenses, receipt, receipts, refund, spend, spent, save, savings, dollar, dollars, aud, owe, owed, debt, rent, deposit, fee, fees, income, profit, earn, earned, earnings, afterpay, transfer, $',
+  upholstery: 'upholster, upholstery, upholstered, reupholster, reupholstering, recover, recovering, sofa, sofas, couch, couches, lounge, settee, chair, chairs, armchair, armchairs, ottoman, headboard, cushion, cushions, foam, webbing, springs, spring, staple, staples, stapling, tack, tacks, piping, welt, buttoning, tufting, dining chair, bench, seat, seats, stool, footstool, wingback, chaise, frame, batting, wadding, dacron, hessian, calico',
+  sewing: 'sew, sews, sewing, sewn, stitch, stitches, stitching, seam, seams, hem, hems, hemming, thread, needle, needles, bobbin, overlocker, serger, pattern, patterns, alteration, alterations, alter, zip, zips, zipper, button, buttons, buttonhole, dress, dresses, pants, trousers, skirt, shirt, curtain, curtains, blind, blinds, sewing machine, embroidery, quilt, quilting, tailor, tailoring, bias binding, pleat, pleats, dart, darts, cushion cover, cover, covers',
+  fabric: 'fabric, fabrics, material, materials, textile, textiles, cloth, linen, velvet, cotton, leather, vinyl, wool, canvas, metre, metres, yardage, swatch, swatches, polyester, boucle, bouclé, chenille, denim, silk, lining, interfacing, jacquard, damask, tweed, suede, faux leather, outdoor fabric, roll, offcut, offcuts',
+  ideas: 'idea, ideas, brainstorm, concept, concepts, inspiration, inspired, sketch, sketches, design, designs, what if, could try, experiment, prototype, mockup, someday, dream, vision, plan, plans, planning',
+  todo: 'todo, to-do, to do, remember, remind, reminder, don\'t forget, dont forget, must, checklist, asap, follow up, follow-up, call back, ring, email back, reply, respond, chase, check, organise, sort out, book in',
+  shopping: 'buy, buying, bought, shop, shops, shopping, store, bunnings, spotlight, ikea, kmart, officeworks, order online, ordered, parcel, groceries, grocery, supermarket, woolies, woolworths, coles, aldi, costco, ebay, amazon, marketplace, gumtree, list, purchase, purchased',
+  food: 'food, eat, eating, ate, lunch, dinner, breakfast, brunch, cook, cooking, cooked, recipe, recipes, coffee, tea, snack, snacks, meal, meals, restaurant, cafe, café, takeaway, bake, baking, cake, bread, chicken, pasta, vegetables, veggies, fruit, pizza, salad, soup, chocolate',
+  health: 'health, healthy, doctor, gp, dentist, medicine, meds, medication, pain, sick, unwell, headache, migraine, back pain, physio, sore, injury, hospital, prescription, chemist, pharmacy, vitamins, blood test, symptoms, allergy, covid, cold, flu',
+  fitness: 'exercise, gym, walk, walked, walking, run, running, ran, yoga, pilates, stretch, stretching, swim, swimming, bike, cycling, steps, workout, training, fitness',
+  sleep: 'sleep, slept, sleeping, tired, exhausted, nap, insomnia, bed, bedtime, woke, wake, awake, rest',
+  family: 'family, mum, mom, mother, dad, father, parents, sister, brother, sibling, kids, kid, children, son, daughter, partner, husband, wife, nan, nana, grandma, grandpa, pop, aunt, auntie, uncle, cousin, baby, niece, nephew',
+  friends: 'friend, friends, mate, mates, catch up, catch-up, party, visit, visited, hang out, chat, chatted, bestie, neighbour, neighbours',
+  home: 'home, house, flat, unit, apartment, kitchen, bathroom, bedroom, laundry, cleaning, clean, tidy, declutter, repair, repairs, fix, fixed, landlord, real estate, lease, furniture, washing, dishes, vacuum, mop, bins, renovation, paint, painting',
+  garden: 'garden, gardening, plant, plants, pot, pots, soil, seeds, watering, prune, pruning, lawn, mow, mowing, flowers, herbs, veggie patch, compost, weeds, weeding, tree, trees',
+  travel: 'travel, trip, holiday, holidays, flight, flights, fly, airport, hotel, airbnb, train, bus, ferry, opal, map, beach, road trip, passport, luggage, suitcase, tour, getaway',
+  car: 'car, rego, registration, service, tyre, tyres, petrol, fuel, mechanic, parking, toll, tolls, van, ute, drive, driving, drove, traffic, licence',
+  tech: 'phone, mobile, laptop, chromebook, computer, tablet, app, apps, website, wifi, internet, email, emails, password, software, update, bug, charger, printer, battery, screen, google, android, samsung, fold, backup, download',
+  marketing: 'post, posts, posting, instagram, insta, facebook, tiktok, photo shoot, portfolio, review, reviews, advertise, advert, ad, ads, listing, profile, followers, brand, branding, logo, social media, business card, flyer, promo, promotion',
+  learning: 'learn, learning, learnt, learned, course, class, classes, lesson, lessons, tutorial, tutorials, youtube, read, reading, book, books, study, studying, practice, practise, skill, skills, technique, techniques, workshop, tafe, certificate',
+  mood: 'happy, sad, stressed, stress, anxious, anxiety, angry, excited, grateful, gratitude, frustrated, calm, overwhelmed, proud, worried, worry, upset, lonely, feeling, feelings, mood, love, cranky, relieved, motivated, bored',
+  pets: 'dog, dogs, cat, cats, puppy, kitten, vet, pet, pets, walk the dog, kibble, fish, bird, budgie',
+  weather: 'weather, rain, raining, rained, sunny, hot, heat, heatwave, cold, freezing, storm, storms, wind, windy, humid, forecast, hail',
+  events: 'event, events, market, markets, show, expo, concert, wedding, christmas, easter, birthday, anniversary, weekend, festival, celebration, celebrate, gig',
+  admin: 'form, forms, paperwork, insurance, abn, ato, mygov, centrelink, medicare, renewal, renew, application, apply, document, documents, sign, signed, licence, tax return, bas, super, superannuation, accountant',
+  measurements: 'measure, measured, measuring, measurement, measurements, cm, mm, metre, metres, meter, inch, inches, width, height, depth, length, size, sizes, dimensions, wide, deep, tall',
+  tools: 'staple gun, scissors, shears, cutter, rotary cutter, compressor, hammer, drill, pliers, iron, ironing, steamer, tools, tool, glue, spray glue, knife, mallet, tack lifter, regulator',
+  music: 'music, song, songs, playlist, spotify, podcast, podcasts, listen, listening, album, band, singing'
+};
+/* Close synonyms: words in a group count as the same meaning in search. */
+const SYNONYMS = [
+  'sofa couch lounge settee', 'chair armchair seat', 'fabric material textile cloth', 'quote estimate quotation',
+  'client customer', 'money cash dollars funds', 'pay payment paid', 'price cost fee charge', 'invoice bill receipt',
+  'mum mother mom', 'dad father', 'doctor gp', 'car vehicle', 'buy purchase order', 'phone mobile', 'photo picture image pic',
+  'email mail message', 'fix repair mend', 'sew stitch', 'curtain drape', 'measure measurement size dimension',
+  'idea thought concept', 'happy glad pleased', 'sad upset down', 'tired exhausted sleepy', 'cushion pillow',
+  'foam padding wadding batting', 'staple tack', 'job work task', 'meeting appointment', 'shop store', 'friend mate',
+  'house home', 'holiday vacation trip', 'call ring phone', 'kid child children', 'partner husband wife', 'cat kitten',
+  'dog puppy', 'sick unwell ill', 'food meal', 'coffee latte flat-white', 'deliver delivery drop-off', 'pickup collect collection',
+  'leather vinyl', 'zip zipper', 'pants trousers', 'scissors shears', 'review feedback'
+];
+
+const LEX = (() => {
+  const stemTopics = new Map(), phrases = [], topicStems = {}, related = new Map();
+  for (const [topic, list] of Object.entries(TOPICS)) {
+    topicStems[topic] = new Set();
+    for (let w of list.split(',')) {
+      w = w.trim().toLowerCase(); if (!w) continue;
+      if (/[\s']/.test(w) || w === '$') phrases.push([w, topic]);
+      else { const s = stem(w); topicStems[topic].add(s); if (!stemTopics.has(s)) stemTopics.set(s, new Set()); stemTopics.get(s).add(topic); }
+    }
+    topicStems[topic].add(stem(topic));
+  }
+  for (const g of SYNONYMS) {
+    const ss = g.split(/\s+/).map(stem);
+    for (const a of ss) { if (!related.has(a)) related.set(a, new Set()); for (const b of ss) if (b !== a) related.get(a).add(b); }
+  }
+  return { stemTopics, phrases, topicStems, related };
+})();
+
+const Corpus = {
+  version: 0, built: -1, df: new Map(), N: 0, vocab: new Map(),
+  bump() { this.version++; },
+  build() {
+    if (this.built === this.version) return;
+    this.df = new Map(); this.vocab = new Map(); this.N = state.entries.length;
+    for (const e of state.entries) {
+      const st = entryStems(e); e._stems = st;
+      for (const s of st) { this.df.set(s, (this.df.get(s) || 0) + 1); }
+    }
+    this.vocab = this.df; this.built = this.version;
+  }
+};
+function fullText(e) { return [e.text, e.caption, e.ocrText].filter(Boolean).join('\n'); }
+function entryStems(e) {
+  const set = new Set();
+  for (const t of tokenize(fullText(e))) set.add(stem(t));
+  for (const tg of effTags(e)) { set.add(stem(tg)); for (const p of tg.split('-')) if (p) set.add(stem(p)); }
+  return set;
+}
+
+/* Local tagger: returns array of tag names */
+function localTags(text, type) {
+  const tags = [];
+  const lower = ' ' + String(text || '').toLowerCase().replace(/[’‘]/g, "'") + ' ';
+  const toks = tokenize(text);
+  // hashtags typed by the user always count
+  tags.push(...hashtagsOf(text));
+  // topics
+  const score = {};
+  const seen = new Set();
+  for (const t of toks) {
+    const s = stem(t); if (seen.has(s)) continue; seen.add(s);
+    const tops = LEX.stemTopics.get(s); if (!tops) continue;
+    const w = 1 / tops.size;
+    for (const tp of tops) score[tp] = (score[tp] || 0) + w;
+  }
+  for (const [ph, tp] of LEX.phrases) {
+    if (ph === '$') { if (/\$\s?\d/.test(lower)) score[tp] = (score[tp] || 0) + 1; continue; }
+    const re = new RegExp('(^|[^\\p{L}])' + ph.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\p{L}]|$)', 'u');
+    if (re.test(lower)) score[tp] = (score[tp] || 0) + 1.2;
+  }
+  const topics = Object.entries(score).filter(([, v]) => v >= 0.5).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k);
+  tags.push(...topics);
+  // keywords
+  Corpus.build();
+  const N = Math.max(1, Corpus.N);
+  const tf = new Map();
+  for (const t of toks) {
+    if (t.length < 3 || STOP.has(t) || /^\d+([.,]\d+)?$/.test(t) || /^\d/.test(t)) continue;
+    const s = stem(t);
+    if (!tf.has(s)) tf.set(s, { s, word: t, n: 0, proper: false });
+    tf.get(s).n++;
+  }
+  // proper nouns: Capitalised words not at the start of a sentence; ACRONYMS
+  for (const sent of String(text || '').split(/[.!?\n]+/)) {
+    const words = sent.trim().split(/\s+/);
+    words.forEach((w, i) => {
+      const clean = w.replace(/[^\p{L}\p{N}'-]/gu, '').replace(/'s$/, '');
+      if (!clean || clean.length < 2) return;
+      const isAcr = /^[A-Z]{2,6}$/.test(clean);
+      const isCap = i > 0 && /^\p{Lu}\p{Ll}{2,}$/u.test(clean);
+      if ((isAcr || isCap) && !STOP.has(clean.toLowerCase())) {
+        const s = stem(clean.toLowerCase());
+        if (!tf.has(s)) tf.set(s, { s, word: clean.toLowerCase(), n: 0, proper: false });
+        tf.get(s).proper = true;
+      }
+    });
+  }
+  const topicSet = new Set(topics.map(stem));
+  const cands = [];
+  const short = toks.length <= 12;
+  for (const c of tf.values()) {
+    if (topicSet.has(c.s)) continue;
+    if (!c.proper && /(ed|ing)$/.test(c.word) && c.word.length > 4) continue;   // verb forms make poor tags
+    const df = Corpus.df.get(c.s) || 0;
+    let sc = c.n + (c.proper ? 1.5 : 0) + Math.min(df, 5) * 0.2 + (c.word.length >= 6 ? 0.25 : 0);
+    if (LEX.stemTopics.has(c.s)) sc += 0.4;          // a meaningful, known word
+    if (N > 8 && df / N > 0.3) sc -= 1.5;             // too common to be useful
+    if (!short && c.n < 2 && !c.proper && !LEX.stemTopics.has(c.s)) sc -= 0.6;
+    if (sc >= 1) cands.push([c.proper ? c.word : singular(c.word), sc]);
+  }
+  cands.sort((a, b) => b[1] - a[1]);
+  for (const [w] of cands.slice(0, 3)) tags.push(normTag(w));
+  if (type === 'ink') tags.push('drawing');
+  if (type === 'image') tags.push('image');
+  return uniq(tags.filter(Boolean));
+}
+function singular(w) {
+  if (/ies$/.test(w) && w.length > 4) return w.slice(0, -3) + 'y';
+  if (/(ches|shes|xes|sses)$/.test(w)) return w.slice(0, -2);
+  if (/s$/.test(w) && !/(ss|us|is)$/.test(w) && w.length > 4) return w.slice(0, -1);
+  return w;
+}
+function uniq(a) { return [...new Set(a)]; }
+function hashtagsOf(text) { return [...String(text || '').matchAll(/(^|\s)#([\p{L}\p{N}][\p{L}\p{N}_-]{1,39})/gu)].map(m => normTag(m[2])).filter(Boolean); }
+function normTag(s) {
+  return String(s || '').trim().replace(/^#+/, '').toLowerCase()
+    .replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/[\s_]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+}
+function effTags(e) {
+  const rm = new Set(e.removedTags || []);
+  return uniq([...(e.userTags || []), ...(e.autoTags || []).filter(t => !rm.has(t))]);
+}
+function levenshtein(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i]; let best = i;
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      if (cur[j] < best) best = cur[j];
+    }
+    if (best > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/* Show a real word from the entry for a matched stem */
+function wordFor(e, s) {
+  for (const t of tokenize(fullText(e))) if (stem(t) === s) return t;
+  for (const tg of effTags(e)) if (stem(tg) === s || tg.split('-').some(p => stem(p) === s)) return '#' + tg;
+  return s;
+}
+/* Search with related meanings. Returns Map id -> {score, why[]} */
+function searchEntries(q, pool) {
+  Corpus.build();
+  const raw = tokenize(q);
+  let terms = uniq(raw.filter(t => !STOP.has(t)).map(stem));
+  if (!terms.length) terms = uniq(raw.map(stem));
+  const out = new Map();
+  if (!terms.length) return out;
+  const phrase = q.trim().toLowerCase();
+  const cloudRel = (settings.cloudOn && Cloud.ready() && Cloud.relatedCache.get(phrase)) || [];
+  const termMaps = terms.map(t => {
+    const m = new Map(); const put = (s, w, why) => { const p = m.get(s); if (!p || p.w < w) m.set(s, { w, why }); };
+    put(t, 1, null);
+    for (const r of LEX.related.get(t) || []) put(r, 0.75, 'similar');
+    for (const tp of LEX.stemTopics.get(t) || []) put(stem(tp), 0.45, 'topic');
+    if (TOPICS[t]) for (const s of LEX.topicStems[t]) put(s, 0.6, 'topic');
+    for (const v of Corpus.vocab.keys()) {
+      if (v === t || m.has(v)) continue;
+      if (t.length >= 3 && v.startsWith(t) && v.length <= t.length + 4) put(v, 0.85, null);
+      else if (t.length >= 5) { const d = levenshtein(t, v, t.length >= 8 ? 2 : 1); if (d <= (t.length >= 8 ? 2 : 1)) put(v, 0.6, 'spelling'); }
+    }
+    for (const rw of cloudRel) for (const tok of tokenize(rw)) if (!STOP.has(tok)) put(stem(tok), 0.55, 'related');
+    return m;
+  });
+  const threshold = Math.max(0.45, 0.3 * terms.length);
+  for (const e of pool) {
+    const st = e._stems || entryStems(e);
+    let score = 0; const why = [];
+    termMaps.forEach((m, i) => {
+      let best = null;
+      for (const [s, info] of m) if (st.has(s) && (!best || info.w > best.w)) best = { s, ...info };
+      if (best) { score += best.w; const word = wordFor(e, best.s); why.push(best.why ? `${word} (${best.why})` : word); }
+    });
+    if (phrase.includes(' ') && fullText(e).toLowerCase().includes(phrase)) score += 1;
+    if (score >= threshold) out.set(e.id, { score, why: uniq(why) });
+  }
+  return out;
+}
+
+/* =====================================================================
+   Hand-writing recognition (on-device, Chrome on ChromeOS / Android)
+   ===================================================================== */
+const HWR = {
+  _ok: null,
+  async available() {
+    if (this._ok !== null) return this._ok;
+    try {
+      if (!('createHandwritingRecognizer' in navigator)) return (this._ok = false);
+      if (navigator.queryHandwritingRecognizer) {
+        const q = await navigator.queryHandwritingRecognizer({ languages: ['en'] });
+        return (this._ok = !!q);
+      }
+      return (this._ok = true);
+    } catch { return (this._ok = false); }
+  },
+  groupLines(strokes) {
+    const items = strokes.filter(s => s.pts.length).map(s => {
+      let y0 = Infinity, y1 = -Infinity, x0 = Infinity;
+      for (const p of s.pts) { if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; if (p[0] < x0) x0 = p[0]; }
+      return { s, y0, y1, x0, cy: (y0 + y1) / 2 };
+    }).sort((a, b) => a.cy - b.cy);
+    const lines = [];
+    for (const it of items) {
+      const L = lines.find(l => it.cy >= l.y0 - 6 && it.cy <= l.y1 + 6);
+      if (L) { L.items.push(it); L.y0 = Math.min(L.y0, it.y0); L.y1 = Math.max(L.y1, it.y1); }
+      else lines.push({ y0: it.y0, y1: it.y1, items: [it] });
+    }
+    lines.sort((a, b) => a.y0 - b.y0);
+    return lines.map(l => l.items.map(i => i.s));
+  },
+  async recognise(ink) {
+    const rec = await navigator.createHandwritingRecognizer({ languages: ['en'] });
+    const out = [];
+    try {
+      for (const line of this.groupLines(ink.strokes)) {
+        const d = rec.startDrawing({ recognitionType: 'text', inputType: ink.inputType === 'pen' ? 'stylus' : (ink.inputType === 'mouse' ? 'mouse' : 'touch') });
+        for (const st of line) {
+          const s = new HandwritingStroke();
+          for (const p of st.pts) s.addPoint({ x: p[0], y: p[1], t: p[3] || 0 });
+          d.addStroke(s);
+        }
+        const preds = await d.getPrediction();
+        if (preds && preds[0] && preds[0].text) out.push(preds[0].text);
+        if (d.clear) d.clear();
+      }
+    } finally { try { rec.finish(); } catch {} }
+    return out.join('\n');
+  }
+};
+
+/* =====================================================================
+   OCR (Tesseract.js, on-device; engine downloads once then is cached)
+   ===================================================================== */
+const TESS_URL = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    if ($(`script[src="${src}"]`) && window.Tesseract) return res();
+    const s = document.createElement('script'); s.src = src; s.async = true; s.crossOrigin = 'anonymous';
+    s.onload = () => res(); s.onerror = () => { s.remove(); rej(new Error('Could not load ' + src)); };
+    document.head.appendChild(s);
+  });
+}
+const OCR = {
+  worker: null, loading: null,
+  load() {
+    if (this.worker) return Promise.resolve(this.worker);
+    if (this.loading) return this.loading;
+    this.loading = (async () => {
+      await loadScript(TESS_URL);
+      this.worker = await Tesseract.createWorker('eng');
+      return this.worker;
+    })().catch(err => { this.loading = null; const e = new Error('Text reader not available (offline?)'); e.offline = true; e.cause = err; throw e; });
+    return this.loading;
+  },
+  async recognise(blob) {
+    const w = await this.load();
+    const img = await ocrPrep(blob);
+    const { data } = await w.recognize(img);
+    let text;
+    if (data.words && data.words.length) {
+      // keep only words Tesseract is fairly sure about
+      const lines = [];
+      for (const ln of data.lines || []) {
+        const ws = (ln.words || []).filter(x => x.confidence >= 60 && /[\p{L}\p{N}]/u.test(x.text)).map(x => x.text);
+        if (ws.length) lines.push(ws.join(' '));
+      }
+      text = lines.join('\n');
+      if (!text && data.confidence >= 60) text = data.text;
+    } else text = data.confidence >= 50 ? data.text : '';
+    return (text || '').replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+  }
+};
+/* Downscale very large photos before OCR to keep the phone responsive */
+async function ocrPrep(blob) {
+  try {
+    const bmp = await createImageBitmap(blob);
+    const max = 2000, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    if (k === 1) { bmp.close && bmp.close(); return blob; }
+    const c = document.createElement('canvas'); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(bmp, 0, 0, c.width, c.height);
+    return await new Promise(r => c.toBlob(r, 'image/png'));
+  } catch { return blob; }
+}
+
+/* =====================================================================
+   Optional cloud AI (Anthropic Claude) – only with the user's own key
+   ===================================================================== */
+const Cloud = {
+  URL: 'https://api.anthropic.com/v1/messages',
+  relatedCache: new Map(),
+  ready() { return !!(settings.cloudOn && settings.apiKey && navigator.onLine); },
+  async call(content, maxTokens = 4000) {
+    const model = settings.model || 'claude-opus-5-5';
+    const base = {
+      'content-type': 'application/json', 'x-api-key': settings.apiKey.trim(),
+      'anthropic-version': '2026-10-21', 'anthropic-dangerous-direct-browser-access': 'true'
+    };
+    const body = {
+      model, max_tokens: maxTokens, output_config: { effort: 'low' },
+      system: 'You help organise a personal notebook. Always reply with a single JSON object and nothing else. Use Australian English spelling.',
+      messages: [{ role: 'user', content }]
+    };
+    const withFallback = model !== 'claude-haiku-5-5';
+    const send = async fb => {
+      const h = { ...base }, b = { ...body };
+      if (fb) { h['anthropic-beta'] = 'server-side-fallback-2026-07-01'; b.fallbacks = 'default'; }
+      return fetch(this.URL, { method: 'POST', headers: h, body: JSON.stringify(b) });
+    };
+    let r;
+    try { r = await send(withFallback); }
+    catch (err) { if (!withFallback) throw err; r = await send(false); }
+    if (withFallback && r.status === 400) { const t = await r.clone().text(); if (/fallback|beta/i.test(t)) r = await send(false); }
+    if (!r.ok) {
+      let msg = ''; try { msg = (await r.json()).error.message; } catch {}
+      const e = new Error(r.status === 401 ? 'API key not accepted' : `Cloud AI error ${r.status}${msg ? ': ' + msg : ''}`); e.status = r.status; throw e;
+    }
+    const j = await r.json();
+    if (j.stop_reason === 'refusal') throw new Error('Cloud AI declined this entry');
+    const txt = (j.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+    const m = txt.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('Cloud AI gave no usable answer');
+    return JSON.parse(m[0]);
+  },
+  async tags(text) {
+    const j = await this.call([{ type: 'text', text:
+      'Tag this notebook entry so related entries can be found later. Give 2 to 6 short lowercase tags: the broad topics ' +
+      '(for example work, money, health, family, sewing, upholstery, ideas, todo) and the key specific subjects (people, items, places). ' +
+      'Use single words, or two words joined by a hyphen. Reply as {"tags":["..."]}.\n\nEntry:\n"""\n' + text.slice(0, 8000) + '\n"""' }], 1500);
+    return (j.tags || []).map(normTag).filter(Boolean).slice(0, 8);
+  },
+  async readImage(blob, kind) {
+    const { data, type } = await imageToBase64(blob, 1568);
+    const j = await this.call([
+      { type: 'image', source: { type: 'base64', media_type: type, data } },
+      { type: 'text', text:
+        `This ${kind === 'ink' ? 'is hand-writing or a drawing from a notebook' : 'is an image saved in a notebook'}. ` +
+        'Transcribe any readable text exactly (keep line breaks; empty string if none). Then give 2 to 6 short lowercase tags for the topics ' +
+        'and key subjects (what it shows or is about). Single words or two words joined by a hyphen. Reply as {"text":"...","tags":["..."]}.' }
+    ], 3000);
+    return { text: String(j.text || ''), tags: (j.tags || []).map(normTag).filter(Boolean).slice(0, 8) };
+  },
+  async related(q) {
+    const j = await this.call([{ type: 'text', text:
+      'List up to 10 single words or short phrases that mean the same as, or are closely related to, this search: "' + q.slice(0, 200) +
+      '". Include synonyms and Australian terms. Reply as {"related":["..."]}.' }], 1000);
+    return (j.related || []).map(String).slice(0, 12);
+  }
+};
+async function imageToBase64(blob, max) {
+  const bmp = await createImageBitmap(blob);
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(bmp.width * k)); c.height = Math.max(1, Math.round(bmp.height * k));
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(bmp, 0, 0, c.width, c.height);
+  const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.88));
+  const data = await blobToDataURL(b);
+  return { data: data.split(',')[1], type: 'image/jpeg' };
+}
+function blobToDataURL(b) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => rej(r.error); r.readAsDataURL(b); }); }
+
+/* =====================================================================
+   Background analyser queue
+   ===================================================================== */
+const Analyser = {
+  queue: [], running: false,
+  enqueue(id) { if (!this.queue.includes(id)) this.queue.push(id); setTimeout(() => this.run(), 0); },
+  async run() {
+    if (this.running) return; this.running = true;
+    try {
+      while (this.queue.length) {
+        const id = this.queue.shift(); const e = state.byId.get(id); if (!e) continue;
+        try { await analyseEntry(e); }
+        catch (err) { console.warn('analyse failed', err); e.status = 'error'; e._busy = false; await DB.put(e).catch(() => {}); refreshEntry(e); }
+      }
+    } finally { this.running = false; }
+  }
+};
+async function analyseEntry(e) {
+  const rev = e.rev;
+  e._busy = true; refreshEntry(e);
+  let by = 'device', warn = '', cloudTags = null;
+  if (e.type !== 'text' && e.readRev !== e.mediaRev) {
+    const blob = await DB.getBlob(e.blobId);
+    let read = null;
+    if (blob && Cloud.ready()) {
+      try { read = await Cloud.readImage(blob, e.type); by = 'cloud'; cloudTags = read.tags; }
+      catch (err) { warn = 'Cloud AI failed (' + err.message + '), used on-device'; }
+    }
+    if (!read && blob) {
+      let t = '';
+      if (e.type === 'ink' && e.ink && await HWR.available()) { try { t = await HWR.recognise(e.ink); } catch (err) { console.warn('HWR', err); } }
+      if (!t.trim()) {
+        try { t = await OCR.recognise(blob); }
+        catch (err) {
+          if (err.offline) {
+            e._busy = false; e.status = 'waiting';
+            e.autoTags = localTags(fullText(e), e.type);
+            await DB.put(e); refreshEntry(e); renderTags(); return;
+          }
+          throw err;
+        }
+      }
+      read = { text: t };
+    }
+    if (e.rev !== rev || !state.byId.has(e.id)) { e._busy = false; if (state.byId.has(e.id)) Analyser.enqueue(e.id); return; }
+    e.ocrText = (read && read.text || '').trim();
+    e.readRev = e.mediaRev;
+  }
+  const full = fullText(e);
+  let auto = localTags(full, e.type);
+  const typeTag = e.type === 'ink' ? 'drawing' : e.type === 'image' ? 'image' : null;
+  if (cloudTags) auto = uniq([...hashtagsOf(full), ...cloudTags, typeTag].filter(Boolean));
+  else if (Cloud.ready() && full.trim()) {
+    try {
+      const ct = await Cloud.tags(full); by = 'cloud';
+      auto = uniq([...hashtagsOf(full), ...ct, typeTag].filter(Boolean));
+    } catch (err) { warn = 'Cloud AI failed (' + err.message + '), used on-device'; }
+  }
+  if (e.rev !== rev || !state.byId.has(e.id)) { e._busy = false; if (state.byId.has(e.id)) Analyser.enqueue(e.id); return; }
+  e.autoTags = auto; e.status = 'done'; e.analysedBy = by; e.warn = warn; e._busy = false;
+  await DB.put(e);
+  Corpus.bump(); refreshEntry(e); renderTags();
+  if (state.filter.q || state.filter.tag) scheduleFilterRefresh();
+}
+
+/* =====================================================================
+   State, feed rendering and lazy loading
+   ===================================================================== */
+const state = {
+  entries: [], byId: new Map(), filter: { tag: null, q: '' }, list: [], start: 0, end: 0,
+  matches: null, filtered: false
+};
+const feed = $('#feed'), scroller = $('#scroller');
+const blobURLs = new Map();
+
+function computeList() {
+  let pool = state.entries;
+  state.matches = null; state.filtered = !!(state.filter.tag || state.filter.q.trim());
+  if (state.filter.tag) pool = pool.filter(e => effTags(e).includes(state.filter.tag));
+  if (state.filter.q.trim()) { const m = searchEntries(state.filter.q, pool); state.matches = m; pool = pool.filter(e => m.has(e.id)); }
+  state.list = settings.order === 'desc' ? pool.slice().reverse() : pool.slice();
+}
+function cardsMode() { return state.filtered && settings.view === 'cards'; }
+
+function renderFeed(anchor) {
+  computeList();
+  feed.classList.toggle('cards', cardsMode());
+  feed.innerHTML = '';
+  const N = state.list.length;
+  updateFilterBar();
+  if (!N) {
+    feed.innerHTML = state.filtered
+      ? '<div class="empty"><p><b>No entries match.</b></p><p>Try another word, or clear the filter.</p></div>'
+      : '<div class="empty"><p><b>Your notebook is empty.</b></p><p>Type below and tap Add, or use Draw or Image at the top. Every entry gets the time and tags automatically.</p></div>';
+    state.start = state.end = 0; return;
+  }
+  if (!anchor) anchor = state.filtered ? 'top' : (settings.order === 'asc' ? 'bottom' : 'top');
+  if (anchor === 'bottom') { state.start = Math.max(0, N - CHUNK); state.end = N; }
+  else { state.start = 0; state.end = Math.min(N, CHUNK); }
+  feed.appendChild(buildRange(state.start, state.end, true));
+  requestAnimationFrame(() => {
+    scroller.scrollTop = anchor === 'bottom' ? scroller.scrollHeight : 0;
+    setTimeout(checkSentinels, 50);
+  });
+}
+function buildRange(a, b, forceFirstDay) {
+  const frag = document.createDocumentFragment(); const cards = cardsMode();
+  for (let i = a; i < b; i++) {
+    const e = state.list[i];
+    if (!cards) {
+      const dk = dayKey(e.created);
+      if ((i === a && forceFirstDay) || i === 0 || dayKey(state.list[i - 1].created) !== dk) frag.appendChild(daySep(e.created));
+    }
+    frag.appendChild(renderEntry(e));
+  }
+  return frag;
+}
+function daySep(ts) {
+  const d = document.createElement('div'); d.className = 'day'; d.dataset.day = dayKey(ts);
+  d.setAttribute('role', 'heading'); d.setAttribute('aria-level', '2'); d.textContent = dayLabel(ts); return d;
+}
+function loadOlderTop() {
+  if (state.start <= 0) return;
+  const a = Math.max(0, state.start - CHUNK), oldStart = state.start;
+  const prevH = scroller.scrollHeight, prevTop = scroller.scrollTop;
+  const frag = buildRange(a, oldStart, true);
+  const first = feed.firstElementChild;
+  if (first && first.classList.contains('day') && first.dataset.day === dayKey(state.list[oldStart - 1].created)) first.remove();
+  feed.insertBefore(frag, feed.firstChild);
+  state.start = a;
+  scroller.scrollTop = prevTop + (scroller.scrollHeight - prevH);
+}
+function loadMoreBottom() {
+  if (state.end >= state.list.length) return;
+  const b = Math.min(state.list.length, state.end + CHUNK);
+  feed.appendChild(buildRange(state.end, b, false));
+  state.end = b;
+}
+function checkSentinels() {
+  const r = scroller.getBoundingClientRect();
+  const t = $('#topS').getBoundingClientRect(), bt = $('#botS').getBoundingClientRect();
+  if (t.bottom > r.top - 800 && state.start > 0) loadOlderTop();
+  if (bt.top < r.bottom + 800 && state.end < state.list.length) loadMoreBottom();
+}
+const sentObs = new IntersectionObserver(ents => {
+  for (const en of ents) if (en.isIntersecting) { if (en.target.id === 'topS') loadOlderTop(); else loadMoreBottom(); }
+}, { root: scroller, rootMargin: '800px 0px' });
+sentObs.observe($('#topS')); sentObs.observe($('#botS'));
+let scrollRaf = 0;
+scroller.addEventListener('scroll', () => { if (!scrollRaf) scrollRaf = requestAnimationFrame(() => { scrollRaf = 0; checkSentinels(); }); }, { passive: true });
+
+const imgObs = new IntersectionObserver(ents => {
+  for (const en of ents) if (en.isIntersecting) { imgObs.unobserve(en.target); loadImg(en.target); }
+}, { root: scroller, rootMargin: '1000px 0px' });
+async function blobURL(id) {
+  if (!id) return null;
+  if (blobURLs.has(id)) return blobURLs.get(id);
+  const b = await DB.getBlob(id); if (!b) return null;
+  const u = URL.createObjectURL(b); blobURLs.set(id, u); return u;
+}
+async function loadImg(img) {
+  const u = await blobURL(img.dataset.blob);
+  if (u) { img.src = u; img.onload = () => img.classList.remove('notloaded'); }
+}
+
+function statusHTML(e) {
+  if (e._busy) return `<span class="status">⏳ ${e.type === 'text' ? 'Tagging…' : 'Reading &amp; tagging…'}</span>`;
+  if (e.status === 'pending') return '<span class="status">⏳ Tagging soon</span>';
+  if (e.status === 'waiting') return '<span class="status">⏸ Text will be read when online</span>';
+  if (e.status === 'error') return '<span class="status">⚠ Couldn’t analyse – will retry later</span>';
+  if (e.warn) return `<span class="status" title="${esc(e.warn)}">⚠ Cloud AI failed – tagged on device</span>`;
+  return '';
+}
+const EDIT_ICON = '<svg class="i" viewBox="0 0 24 24"><path d="M15.5 4.5l4 4L9 19l-5 1 1-5z"/></svg>';
+function renderEntry(e) {
+  const a = document.createElement('article');
+  a.className = 'entry'; a.dataset.id = e.id;
+  const cards = cardsMode();
+  const tsText = cards ? `${shortDay(e.created)} · ${hhmm(e.created)}` : hhmm(e.created);
+  const tags = effTags(e);
+  let media = '';
+  if (e.type === 'image' || e.type === 'ink') {
+    const alt = e.type === 'ink' ? 'Hand-writing or drawing' : 'Image';
+    media = `<div class="media"><img class="notloaded${e.type === 'ink' ? ' ink' : ''}" data-blob="${esc(e.blobId)}" alt="${alt}${e.ocrText ? ': ' + esc(e.ocrText.slice(0, 120)) : ''}" ${e.w ? `width="${Math.round(e.w)}" height="${Math.round(e.h)}"` : ''} decoding="async"></div>`;
+  }
+  const body = e.type === 'text' ? (e.text ? `<div class="text">${esc(e.text)}</div>` : '') : (e.caption ? `<div class="text">${esc(e.caption)}</div>` : '');
+  const found = e.type !== 'text' && e.ocrText ? `<details class="found"><summary>Text found</summary><div>${esc(e.ocrText)}</div></details>` : '';
+  const m = state.matches && state.matches.get(e.id);
+  const why = m && m.why.length ? `<div class="why">Matched: ${esc(m.why.join(', '))}</div>` : '';
+  const edited = e.edited ? `<span class="edited">edited ${hhmm(e.updated)}${dayKey(e.updated) !== dayKey(e.created) ? ' ' + shortDay(e.updated) : ''}</span>` : '';
+  a.innerHTML =
+    `<time class="ts" datetime="${new Date(e.created).toISOString()}" title="${dayLabel(e.created)} ${hhmm(e.created)}">${tsText}</time>` +
+    `<div class="body">${media}${body}${found}${why}<div class="meta">` +
+    tags.map(t => `<button class="tag" data-tag="${esc(t)}" aria-pressed="${state.filter.tag === t}">#${esc(t)}</button>`).join('') +
+    statusHTML(e) + edited +
+    `<button class="editbtn" data-edit aria-label="Edit entry from ${hhmm(e.created)}">${EDIT_ICON}Edit</button></div></div>`;
+  const img = a.querySelector('img[data-blob]'); if (img) imgObs.observe(img);
+  return a;
+}
+function refreshEntry(e) {
+  const old = feed.querySelector(`article[data-id="${CSS.escape(e.id)}"]`);
+  if (!old || old.classList.contains('editing')) return;
+  const prevH = old.offsetHeight, above = old.getBoundingClientRect().bottom < scroller.getBoundingClientRect().top + 4;
+  const n = renderEntry(e); old.replaceWith(n);
+  if (above) scroller.scrollTop += n.offsetHeight - prevH;
+}
+
+/* ---------------- tag list ---------------- */
+function tagCounts() {
+  const c = new Map();
+  for (const e of state.entries) for (const t of effTags(e)) c.set(t, (c.get(t) || 0) + 1);
+  return [...c.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+let tagsRaf = 0;
+function renderTags() {
+  if (tagsRaf) return;
+  tagsRaf = requestAnimationFrame(() => {
+    tagsRaf = 0;
+    const list = $('#tagList'); const tc = tagCounts();
+    if (!tc.length) { list.innerHTML = '<li class="hint">Tags appear here as you add entries.</li>'; return; }
+    list.innerHTML = tc.map(([t, n]) =>
+      `<li><button class="tagrow" data-tag="${esc(t)}" aria-pressed="${state.filter.tag === t}"><span>${state.filter.tag === t ? '✓ ' : ''}#${esc(t)}</span><span class="n">${n}<span class="sr"> entries</span></span></button></li>`).join('');
+  });
+}
+
+/* ---------------- filtering ---------------- */
+function setTagFilter(tag) {
+  state.filter.tag = state.filter.tag === tag ? null : tag;
+  renderFeed(); renderTags();
+  if (!WIDE()) closePanel();
+}
+function clearFilter() {
+  state.filter.tag = null; state.filter.q = ''; $('#q').value = ''; $('#qClear').hidden = true;
+  renderFeed(); renderTags();
+}
+let filterRefreshT;
+function scheduleFilterRefresh() {
+  clearTimeout(filterRefreshT);
+  filterRefreshT = setTimeout(() => { const top = scroller.scrollTop; renderFeed('top'); scroller.scrollTop = top; }, 400);
+}
+function updateFilterBar() {
+  const fb = $('#filterbar');
+  fb.hidden = !state.filtered;
+  $('#tbSearch').setAttribute('aria-pressed', String(state.filtered || $('#panel').classList.contains('open')));
+  if (!state.filtered) return;
+  const n = state.list.length;
+  $('#fbText').textContent = `${n} ${n === 1 ? 'entry' : 'entries'}`;
+  const chips = [];
+  if (state.filter.tag) chips.push(`<span class="fchip">#${esc(state.filter.tag)}<button data-unf="tag" aria-label="Remove tag filter">✕</button></span>`);
+  if (state.filter.q.trim()) chips.push(`<span class="fchip">“${esc(state.filter.q.trim())}”<button data-unf="q" aria-label="Remove search">✕</button></span>`);
+  $('#fbChips').innerHTML = chips.join('');
+  $$('#filterbar .seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === settings.view)));
+  $('#panelResults').textContent = `Show ${n} ${n === 1 ? 'result' : 'results'}`;
+}
+
+/* ---------------- panel ---------------- */
+function openPanel() {
+  $('#panel').classList.add('open');
+  if (!WIDE()) $('#backdrop').classList.add('show');
+  else { settings.panelWide = true; saveSettings(); }
+  updateFilterBar();
+}
+function closePanel() {
+  $('#panel').classList.remove('open'); $('#backdrop').classList.remove('show');
+  if (WIDE()) { settings.panelWide = false; saveSettings(); }
+  updateFilterBar();
+}
+
+/* =====================================================================
+   Adding entries
+   ===================================================================== */
+function newEntry(type, fields) {
+  const now = Date.now();
+  return Object.assign({
+    id: uid(), created: now, updated: now, type, text: '', caption: '', blobId: null, w: 0, h: 0, ink: null,
+    ocrText: '', readRev: null, mediaRev: 1, rev: 1, autoTags: [], userTags: [], removedTags: [],
+    status: 'pending', analysedBy: '', warn: '', edited: false
+  }, fields);
+}
+async function addEntry(e) {
+  state.entries.push(e); state.byId.set(e.id, e);
+  state.entries.sort((a, b) => a.created - b.created);
+  Corpus.bump();
+  await DB.put(e);
+  if (state.filtered) { state.filter.tag = null; state.filter.q = ''; $('#q').value = ''; $('#qClear').hidden = true; }
+  renderFeed(settings.order === 'asc' ? 'bottom' : 'top');
+  renderTags();
+  Analyser.enqueue(e.id);
+  askPersist();
+}
+async function addText() {
+  const ta = $('#composer'); const text = ta.value.replace(/\s+$/, '');
+  if (!text.trim()) { ta.focus(); toast('Type something first'); return; }
+  ta.value = ''; autoGrow(ta); try { localStorage.removeItem('runonmate.draft'); } catch {}
+  await addEntry(newEntry('text', { text }));
+}
+let persistAsked = false;
+function askPersist() {
+  if (persistAsked) return; persistAsked = true;
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {}
+}
+function autoGrow(ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, innerHeight * 0.4) + 'px'; }
+
+/* images */
+async function prepareImage(file) {
+  const MAX = 2400;
+  let bmp;
+  try { bmp = await createImageBitmap(file); } catch { throw new Error('That file isn’t an image this browser can open'); }
+  const w = bmp.width, h = bmp.height, k = Math.min(1, MAX / Math.max(w, h));
+  if (k === 1 && file.size < 3.5e6 && /^image\/(jpeg|png|webp|gif)$/.test(file.type)) { bmp.close && bmp.close(); return { blob: file, w, h }; }
+  const c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const x = c.getContext('2d');
+  const png = file.type === 'image/png';
+  if (!png) { x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); }
+  x.drawImage(bmp, 0, 0, c.width, c.height); bmp.close && bmp.close();
+  const blob = await new Promise(r => c.toBlob(r, png ? 'image/png' : 'image/jpeg', 0.9));
+  return { blob, w: c.width, h: c.height };
+}
+async function addImages(files) {
+  const list = [...files].filter(f => f && (f.type.startsWith('image/') || /\.(jpe?g|png|webp|gif|heic|avif|bmp)$/i.test(f.name || '')));
+  if (!list.length) { toast('No image found'); return; }
+  for (const f of list) {
+    try {
+      const { blob, w, h } = await prepareImage(f);
+      const blobId = uid(); await DB.putBlob(blobId, blob);
+      await addEntry(newEntry('image', { blobId, w, h }));
+    } catch (err) { toast(err.message); }
+  }
+}
+
+/* =====================================================================
+   Drawing / hand-writing canvas
+   ===================================================================== */
+const Draw = (() => {
+  const dlg = $('#drawDlg'), cv = $('#drawCanvas'), wrap = $('#drawWrap');
+  const ctx = cv.getContext('2d');
+  const SIZES = { s: 2, m: 3.5, l: 7 };
+  let W = 0, H = 0, dpr = 1, strokes = [], cur = null, undo = [], tool = 'pen', size = 'm', colour = '#1d1d1b';
+  let penSeen = false, pressureSeen = false, t0 = 0, onSave = null, dirty = false, inputType = 'touch', activeId = null;
+
+  function setup(ink) {
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    const availW = wrap.clientWidth, availH = wrap.clientHeight;
+    const A4PX = 794;                                   // 210 mm at 96 dpi: same width as the notebook page
+    W = Math.max(Math.min(availW, A4PX), ink ? ink.w : 0); H = Math.max(Math.round(availH * 1.15), ink ? ink.h : 0, 480);
+    strokes = ink ? JSON.parse(JSON.stringify(ink.strokes)) : [];
+    inputType = ink && ink.inputType || 'touch';
+    undo = []; dirty = false; cur = null;
+    resize();
+  }
+  function resize() {
+    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+    cv.style.width = W + 'px'; cv.style.height = H + 'px';
+    redraw();
+  }
+  function widthAt(st, p) { const base = SIZES[st.z] || 3.5; return st.pr ? base * (0.35 + 1.3 * p) : base; }
+  function paintStroke(c, st) {
+    c.strokeStyle = st.c; c.fillStyle = st.c; c.lineCap = 'round'; c.lineJoin = 'round';
+    const pts = st.pts;
+    if (pts.length === 1) { c.beginPath(); c.arc(pts[0][0], pts[0][1], widthAt(st, pts[0][2]) / 2, 0, Math.PI * 2); c.fill(); return; }
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      c.lineWidth = widthAt(st, (a[2] + b[2]) / 2);
+      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    }
+  }
+  function redraw() {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = '#e6eaf2'; ctx.lineWidth = 1;          // faint notebook ruling (not saved)
+    for (let y = 48; y < H; y += 44) { ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke(); }
+    for (const st of strokes) paintStroke(ctx, st);
+  }
+  function pos(ev) { const r = cv.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; }
+  function pressure(ev) {
+    if (ev.pointerType === 'pen' && ev.pressure > 0) { if (ev.pressure !== 0.5) pressureSeen = true; return ev.pressure; }
+    return 0.5;
+  }
+  function eraseAt(x, y) {
+    const before = strokes.length;
+    strokes = strokes.filter(st => !st.pts.some(p => Math.hypot(p[0] - x, p[1] - y) < 12 + widthAt(st, p[2])));
+    if (strokes.length !== before) { dirty = true; redraw(); }
+  }
+  cv.addEventListener('pointerdown', ev => {
+    if (ev.pointerType === 'pen' && !penSeen) { penSeen = true; cv.style.touchAction = 'pan-y'; note(); }
+    if (penSeen && ev.pointerType === 'touch') return;           // palm rejection: finger scrolls once a pen is used
+    if (activeId !== null) return;
+    ev.preventDefault();
+    activeId = ev.pointerId; try { cv.setPointerCapture(ev.pointerId); } catch {}
+    inputType = ev.pointerType || 'touch';
+    undo.push(JSON.stringify(strokes)); if (undo.length > 60) undo.shift();
+    const [x, y] = pos(ev);
+    if (tool === 'eraser' || ev.buttons === 32) { cur = { erasing: true }; eraseAt(x, y); return; }
+    if (!t0 || !strokes.length) t0 = performance.now();
+    cur = { c: colour, z: size, pr: ev.pointerType === 'pen', pts: [[x, y, pressure(ev), Math.round(performance.now() - t0)]] };
+    strokes.push(cur); dirty = true; paintStroke(ctx, cur);
+  });
+  cv.addEventListener('pointermove', ev => {
+    if (ev.pointerId !== activeId || !cur) return;
+    ev.preventDefault();
+    const evs = ev.getCoalescedEvents ? ev.getCoalescedEvents() : [ev];
+    for (const ce of (evs.length ? evs : [ev])) {
+      const [x, y] = pos(ce);
+      if (cur.erasing) { eraseAt(x, y); continue; }
+      const last = cur.pts[cur.pts.length - 1];
+      if (Math.hypot(x - last[0], y - last[1]) < 0.8) continue;
+      const p = [x, y, pressure(ce), Math.round(performance.now() - t0)];
+      cur.pts.push(p);
+      ctx.strokeStyle = cur.c; ctx.lineCap = 'round'; ctx.lineWidth = widthAt(cur, (last[2] + p[2]) / 2);
+      ctx.beginPath(); ctx.moveTo(last[0], last[1]); ctx.lineTo(x, y); ctx.stroke();
+    }
+    if (pressureSeen) note();
+  });
+  const end = ev => { if (ev.pointerId !== activeId) return; activeId = null; cur = null; };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end); cv.addEventListener('lostpointercapture', end);
+
+  function note() {
+    $('#pressureNote').textContent = penSeen ? (pressureSeen ? '✓ Pen pressure on · finger scrolls' : '✓ Pen detected · finger scrolls') : '';
+  }
+  function setTool(t) { tool = t; $('#toolPen').setAttribute('aria-pressed', t === 'pen'); $('#toolEraser').setAttribute('aria-pressed', t === 'eraser'); }
+  $('#toolPen').onclick = () => setTool('pen');
+  $('#toolEraser').onclick = () => setTool('eraser');
+  $$('#drawDlg [data-size]').forEach(b => b.onclick = () => { size = b.dataset.size; $$('#drawDlg [data-size]').forEach(x => x.setAttribute('aria-pressed', x === b)); setTool('pen'); });
+  $$('#drawDlg [data-colour]').forEach(b => b.onclick = () => { colour = b.dataset.colour; $$('#drawDlg [data-colour]').forEach(x => x.setAttribute('aria-pressed', x === b)); setTool('pen'); });
+  $('#drawUndo').onclick = () => { if (undo.length) { strokes = JSON.parse(undo.pop()); dirty = true; redraw(); } };
+  $('#drawClear').onclick = () => { if (!strokes.length) return; undo.push(JSON.stringify(strokes)); strokes = []; dirty = true; redraw(); };
+  $('#drawMore').onclick = () => { H += Math.round(wrap.clientHeight * 0.6); resize(); wrap.scrollTop = wrap.scrollHeight; };
+  $('#drawCancel').onclick = () => close(false);
+  dlg.addEventListener('cancel', ev => { ev.preventDefault(); close(false); });
+  $('#drawSave').onclick = () => save();
+
+  function close(force) {
+    if (!force && dirty && strokes.length && !confirm('Discard this drawing?')) return;
+    dlg.close(); onSave = null;
+  }
+  async function save() {
+    if (!strokes.length) { toast('Nothing drawn yet'); return; }
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const st of strokes) for (const p of st.pts) {
+      const r = widthAt(st, p[2]) / 2;
+      x0 = Math.min(x0, p[0] - r); y0 = Math.min(y0, p[1] - r); x1 = Math.max(x1, p[0] + r); y1 = Math.max(y1, p[1] + r);
+    }
+    const PAD = 14;
+    x0 = Math.max(0, Math.floor(x0 - PAD)); y0 = Math.max(0, Math.floor(y0 - PAD));
+    x1 = Math.min(W, Math.ceil(x1 + PAD)); y1 = Math.min(H, Math.ceil(y1 + PAD));
+    const w = Math.max(20, x1 - x0), h = Math.max(20, y1 - y0);
+    const scale = Math.min(2, 2400 / Math.max(w, h));
+    const c = document.createElement('canvas'); c.width = Math.round(w * scale); c.height = Math.round(h * scale);
+    const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    x.setTransform(scale, 0, 0, scale, -x0 * scale, -y0 * scale);
+    for (const st of strokes) paintStroke(x, st);
+    const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+    const cb = onSave;
+    dlg.close(); onSave = null;
+    if (cb) await cb({ ink: { w: W, h: H, strokes, inputType }, blob, w, h });
+  }
+  return {
+    open(ink, cb) {
+      onSave = cb; dlg.showModal(); setTool('pen'); note();
+      requestAnimationFrame(() => { setup(ink); wrap.scrollTop = 0; });
+    }
+  };
+})();
+
+/* =====================================================================
+   Editing entries (all days)
+   ===================================================================== */
+function enterEdit(e) {
+  const art = feed.querySelector(`article[data-id="${CSS.escape(e.id)}"]`); if (!art) return;
+  $$('article.editing').forEach(a => { const o = state.byId.get(a.dataset.id); a.classList.remove('editing'); if (o) refreshEntry(o); });
+  art.classList.add('editing');
+  const work = {
+    text: e.type === 'text' ? e.text : e.caption,
+    tags: effTags(e).map(t => ({ t, src: (e.userTags || []).includes(t) ? 'user' : 'auto' })),
+    removedAuto: new Set(e.removedTags || []), userTags: new Set(e.userTags || []),
+    newMedia: null
+  };
+  const body = art.querySelector('.body');
+  body.innerHTML = `<form class="editor" novalidate>
+    ${e.type !== 'text' ? `<div class="media"><img class="ed-img${e.type === 'ink' ? ' ink' : ''}" alt="${e.type === 'ink' ? 'Drawing' : 'Image'}"></div>
+       <div class="row"><button type="button" class="btn" data-a="media">${e.type === 'ink' ? '✎ Edit drawing' : '🖼 Replace image'}</button></div>` : ''}
+    <label for="ed-${e.id}">${e.type === 'text' ? 'Text' : 'Note (optional)'}</label>
+    <textarea id="ed-${e.id}" rows="2">${esc(work.text)}</textarea>
+    <label>Tags</label>
+    <div class="row ed-tags"></div>
+    <div class="row"><label class="sr" for="nt-${e.id}">New tag</label><input id="nt-${e.id}" class="field" style="flex:1;min-width:8em" placeholder="Add a tag…" enterkeyhint="done"><button type="button" class="btn" data-a="addtag">+ Add tag</button></div>
+    <div class="row" style="margin-top:4px"><button type="submit" class="btn primary">✓ Save</button><button type="button" class="btn" data-a="cancel">Cancel</button><span style="flex:1"></span><button type="button" class="btn danger" data-a="delete">🗑 Delete entry</button></div>
+    <p class="small" style="margin:0">Created ${dayLabel(e.created)} at ${hhmm(e.created)}. The time stays the same when you edit.</p>
+  </form>`;
+  const form = body.querySelector('form'), ta = form.querySelector('textarea'), tagBox = form.querySelector('.ed-tags'), nt = form.querySelector(`#nt-${CSS.escape(e.id)}`);
+  const img = form.querySelector('.ed-img');
+  if (img) blobURL(e.blobId).then(u => { if (u && !work.newMedia) img.src = u; });
+  autoGrow(ta); ta.addEventListener('input', () => autoGrow(ta));
+  setTimeout(() => { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }, 30);
+
+  function drawTags() {
+    tagBox.innerHTML = work.tags.length ? work.tags.map((x, i) =>
+      `<span class="tagedit"><button type="button" data-ren="${i}" aria-label="Rename tag ${esc(x.t)}">#${esc(x.t)}${x.src === 'auto' ? '<span class="src">auto</span>' : ''} ✎</button><button type="button" class="x" data-del="${i}" aria-label="Delete tag ${esc(x.t)}">✕</button></span>`).join('')
+      : '<span class="small">No tags yet.</span>';
+  }
+  function removeTag(i) {
+    const x = work.tags[i]; work.tags.splice(i, 1);
+    work.userTags.delete(x.t); if ((e.autoTags || []).includes(x.t)) work.removedAuto.add(x.t);
+  }
+  function addTag(raw) {
+    const t = normTag(raw); if (!t) return false;
+    if (work.tags.some(x => x.t === t)) { toast('#' + t + ' is already there'); return false; }
+    work.tags.push({ t, src: 'user' }); work.userTags.add(t); work.removedAuto.delete(t); return true;
+  }
+  drawTags();
+  tagBox.addEventListener('click', ev => {
+    const d = ev.target.closest('[data-del]'), r = ev.target.closest('[data-ren]');
+    if (d) { removeTag(+d.dataset.del); drawTags(); }
+    else if (r) {
+      const i = +r.dataset.ren, x = work.tags[i];
+      const span = r.parentElement;
+      span.innerHTML = `<input aria-label="New name for #${esc(x.t)}" value="${esc(x.t)}" enterkeyhint="done"><button type="button" class="x" data-ok>✓</button>`;
+      const inp = span.querySelector('input'); inp.focus(); inp.select();
+      const done = () => {
+        const v = normTag(inp.value);
+        if (v && v !== x.t) { removeTag(i); if (!work.tags.some(y => y.t === v)) { work.tags.splice(i, 0, { t: v, src: 'user' }); work.userTags.add(v); work.removedAuto.delete(v); } }
+        drawTags();
+      };
+      inp.addEventListener('keydown', k => { if (k.key === 'Enter') { k.preventDefault(); done(); } if (k.key === 'Escape') drawTags(); });
+      span.querySelector('[data-ok]').onclick = done;
+    }
+  });
+  nt.addEventListener('keydown', k => { if (k.key === 'Enter' || k.key === ',') { k.preventDefault(); if (addTag(nt.value)) { nt.value = ''; drawTags(); } } });
+  form.addEventListener('click', async ev => {
+    const b = ev.target.closest('[data-a]'); if (!b) return;
+    const a = b.dataset.a;
+    if (a === 'addtag') { if (addTag(nt.value)) { nt.value = ''; drawTags(); } else nt.focus(); }
+    if (a === 'cancel') { art.classList.remove('editing'); refreshEntry(e); }
+    if (a === 'delete') {
+      if (!confirm(`Delete this entry from ${shortDay(e.created)} ${hhmm(e.created)}? This can’t be undone.`)) return;
+      await deleteEntry(e);
+    }
+    if (a === 'media') {
+      if (e.type === 'ink') {
+        Draw.open(work.newMedia ? work.newMedia.ink : e.ink, async res => {
+          work.newMedia = res; img.src = URL.createObjectURL(res.blob);
+        });
+      } else {
+        const inp = $('#replaceInput'); inp.value = '';
+        inp.onchange = async () => {
+          if (!inp.files[0]) return;
+          try { const r = await prepareImage(inp.files[0]); work.newMedia = r; img.src = URL.createObjectURL(r.blob); } catch (err) { toast(err.message); }
+        };
+        inp.click();
+      }
+    }
+  });
+  form.addEventListener('submit', async ev => {
+    ev.preventDefault();
+    if (nt.value.trim()) addTag(nt.value);
+    const text = ta.value.replace(/\s+$/, '');
+    if (e.type === 'text' && !text.trim()) { toast('Text can’t be empty – use Delete instead'); ta.focus(); return; }
+    const before = e.type === 'text' ? e.text : e.caption;
+    const contentChanged = text !== before || !!work.newMedia;
+    if (e.type === 'text') e.text = text; else e.caption = text;
+    e.userTags = [...work.userTags].filter(t => work.tags.some(x => x.t === t));
+    e.removedTags = [...work.removedAuto];
+    if (work.newMedia) {
+      const oldBlob = e.blobId; const blobId = uid();
+      await DB.putBlob(blobId, work.newMedia.blob);
+      e.blobId = blobId; e.w = work.newMedia.w; e.h = work.newMedia.h;
+      if (work.newMedia.ink) e.ink = work.newMedia.ink;
+      e.mediaRev = (e.mediaRev || 1) + 1; e.ocrText = '';
+      await DB.delBlob(oldBlob).catch(() => {});
+      if (blobURLs.has(oldBlob)) { URL.revokeObjectURL(blobURLs.get(oldBlob)); blobURLs.delete(oldBlob); }
+    }
+    e.updated = Date.now(); if (contentChanged) e.edited = true;
+    if (contentChanged) { e.rev++; e.status = 'pending'; }
+    await DB.put(e);
+    Corpus.bump();
+    art.classList.remove('editing'); refreshEntry(e); renderTags();
+    if (contentChanged) Analyser.enqueue(e.id);
+    toast('Saved');
+  });
+}
+async function deleteEntry(e) {
+  state.byId.delete(e.id);
+  state.entries = state.entries.filter(x => x !== e);
+  await DB.del(e.id); await DB.delBlob(e.blobId).catch(() => {});
+  if (blobURLs.has(e.blobId)) { URL.revokeObjectURL(blobURLs.get(e.blobId)); blobURLs.delete(e.blobId); }
+  Corpus.bump();
+  const art = feed.querySelector(`article[data-id="${CSS.escape(e.id)}"]`);
+  const idx = state.list.indexOf(e);
+  if (idx >= 0) { state.list.splice(idx, 1); if (idx < state.start) state.start--; if (idx < state.end) state.end--; }
+  if (art) {
+    const prev = art.previousElementSibling, next = art.nextElementSibling;
+    art.remove();
+    if (prev && prev.classList.contains('day') && (!next || next.classList.contains('day'))) prev.remove();
+  }
+  if (!state.entries.length || !state.list.length) renderFeed();
+  else updateFilterBar();
+  renderTags(); toast('Entry deleted');
+}
+
+/* =====================================================================
+   Export – Markdown and PDF
+   ===================================================================== */
+function exportOrder() { return settings.order === 'desc' ? state.entries.slice().reverse() : state.entries.slice(); }
+function stamp() { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+async function exportMarkdown() {
+  if (!state.entries.length) { toast('Nothing to export yet'); return; }
+  toast('Preparing Markdown…');
+  const now = Date.now();
+  let md = `# Runonmate notebook\n\n_Exported ${dayLabel(now)} at ${hhmm(now)} · ${state.entries.length} entries_\n`;
+  let lastDay = '';
+  for (const e of exportOrder()) {
+    const dk = dayKey(e.created);
+    if (dk !== lastDay) { md += `\n---\n\n## ${dayLabel(e.created)}\n`; lastDay = dk; }
+    md += `\n**${hhmm(e.created)}**${e.edited ? ` _(edited ${shortDay(e.updated)} ${hhmm(e.updated)})_` : ''}\n\n`;
+    const txt = e.type === 'text' ? e.text : e.caption;
+    if (txt) md += txt.split('\n').join('  \n') + '\n\n';
+    if (e.type !== 'text') {
+      const b = await DB.getBlob(e.blobId);
+      if (b) md += `![${e.type === 'ink' ? 'Hand-writing / drawing' : 'Image'} ${hhmm(e.created)}](${await blobToDataURL(b)})\n\n`;
+      if (e.ocrText) md += e.ocrText.split('\n').map(l => '> ' + l).join('\n').replace(/^> /, '> Text found: ') + '\n\n';
+    }
+    const tags = effTags(e);
+    if (tags.length) md += `Tags: ${tags.map(t => '#' + t).join(' ')}\n`;
+  }
+  download(new Blob([md], { type: 'text/markdown;charset=utf-8' }), `runonmate-notebook-${stamp()}.md`);
+}
+function download(blob, name) {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+async function buildPrint() {
+  const p = $('#print'); const now = Date.now();
+  let html = `<h1>Runonmate notebook</h1><div class="pmeta">Exported ${dayLabel(now)} at ${hhmm(now)} · ${state.entries.length} entries</div>`;
+  let lastDay = '';
+  for (const e of exportOrder()) {
+    const dk = dayKey(e.created);
+    if (dk !== lastDay) { html += `<h2>${dayLabel(e.created)}</h2>`; lastDay = dk; }
+    const txt = e.type === 'text' ? e.text : e.caption;
+    let inner = '';
+    if (e.type !== 'text') { const u = await blobURL(e.blobId); if (u) inner += `<img src="${u}" alt="">`; }
+    if (txt) inner += `<div class="px">${esc(txt)}</div>`;
+    if (e.type !== 'text' && e.ocrText) inner += `<div class="pf">Text found: ${esc(e.ocrText)}</div>`;
+    const tags = effTags(e);
+    if (tags.length || e.edited) inner += `<div class="pg">${tags.map(t => '#' + esc(t)).join('  ')}${e.edited ? `${tags.length ? ' · ' : ''}edited ${shortDay(e.updated)} ${hhmm(e.updated)}` : ''}</div>`;
+    html += `<div class="pe"><div class="pt">${hhmm(e.created)}</div><div>${inner}</div></div>`;
+  }
+  p.innerHTML = html;
+  await Promise.all($$('img', p).map(i => i.decode ? i.decode().catch(() => {}) : null));
+}
+async function exportPdf() {
+  if (!state.entries.length) { toast('Nothing to export yet'); return; }
+  toast('Preparing PDF…');
+  await buildPrint();
+  const oldTitle = document.title; document.title = `runonmate-notebook-${stamp()}`;
+  $('#setDlg').close();
+  const restore = () => { document.title = oldTitle; $('#print').innerHTML = ''; window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  setTimeout(() => window.print(), 60);
+}
+
+/* =====================================================================
+   Settings dialog
+   ===================================================================== */
+async function openSettings() {
+  $('#cloudOn').checked = settings.cloudOn; $('#apiKey').value = settings.apiKey; $('#model').value = settings.model;
+  $('#cloudBox').style.display = settings.cloudOn ? '' : 'none';
+  $('#keyResult').textContent = '';
+  $('#setDlg').showModal();
+  const hw = await HWR.available();
+  $('#aiStatus').innerHTML =
+    `• Tags and topics: <b>on this device</b>${settings.cloudOn && settings.apiKey ? ' (cloud AI on)' : ''}.<br>` +
+    `• Hand-writing: ${hw ? '<b>✓ Chrome’s built-in recogniser</b> (on-device)' : 'read with the on-device text reader (this browser has no built-in hand-writing recogniser)'}.<br>` +
+    `• Text in images: on-device text reader (Tesseract) – ${OCR.worker ? '<b>✓ ready</b>' : 'downloads about 15 MB the first time it’s needed'}.`;
+  try {
+    const est = navigator.storage && navigator.storage.estimate ? await navigator.storage.estimate() : null;
+    const persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : false;
+    $('#storageInfo').textContent = `${state.entries.length} entries${est ? ` · about ${(est.usage / 1048576).toFixed(1)} MB used` : ''} · ` +
+      (persisted ? '✓ Protected from automatic clean-up.' : 'Not yet protected from automatic clean-up (install the app or keep using it and Chrome will usually allow it).');
+  } catch { $('#storageInfo').textContent = `${state.entries.length} entries`; }
+}
+
+/* =====================================================================
+   Wiring
+   ===================================================================== */
+function wire() {
+  const ta = $('#composer');
+  try { const d = localStorage.getItem('runonmate.draft'); if (d) ta.value = d; } catch {}
+  autoGrow(ta);
+  ta.addEventListener('input', () => { autoGrow(ta); try { localStorage.setItem('runonmate.draft', ta.value); } catch {} });
+  ta.addEventListener('keydown', ev => { if (ev.key === 'Enter' && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); addText(); } });
+  $('#addBtn').onclick = addText;
+
+  $('#tbText').onclick = () => { ta.focus(); ta.scrollIntoView({ block: 'nearest' }); };
+  $('#tbDraw').onclick = () => Draw.open(null, async res => {
+    const blobId = uid(); await DB.putBlob(blobId, res.blob);
+    await addEntry(newEntry('ink', { blobId, w: res.w, h: res.h, ink: res.ink }));
+  });
+  $('#tbImage').onclick = () => $('#imgDlg').showModal();
+  $('#pickPhotos').onclick = () => { $('#imgDlg').close(); $('#fileInput').value = ''; $('#fileInput').click(); };
+  $('#pickCamera').onclick = () => { $('#imgDlg').close(); $('#camInput').value = ''; $('#camInput').click(); };
+  $('#fileInput').onchange = ev => addImages(ev.target.files);
+  $('#camInput').onchange = ev => addImages(ev.target.files);
+  $('#tbSearch').onclick = () => {
+    const p = $('#panel');
+    if (p.classList.contains('open')) { if (!WIDE() || document.activeElement === $('#q')) closePanel(); else $('#q').focus(); }
+    else { openPanel(); setTimeout(() => $('#q').focus(), 60); }
+  };
+  $('#backdrop').onclick = closePanel;
+  $('#panelResults').onclick = closePanel;
+  $('#tbOrder').onclick = () => { settings.order = settings.order === 'asc' ? 'desc' : 'asc'; saveSettings(); updateOrderBtn(); renderFeed(); toast(settings.order === 'asc' ? 'Oldest at the top' : 'Newest at the top'); };
+  $('#tbSettings').onclick = openSettings;
+  $$('dialog [data-close]').forEach(b => b.onclick = () => b.closest('dialog').close());
+  $$('dialog').forEach(d => d.addEventListener('click', ev => { if (ev.target === d && d.id !== 'drawDlg') d.close(); }));
+
+  // search
+  let qT;
+  $('#q').addEventListener('input', () => {
+    $('#qClear').hidden = !$('#q').value;
+    clearTimeout(qT);
+    qT = setTimeout(() => {
+      state.filter.q = $('#q').value; renderFeed(); renderTags();
+      const q = state.filter.q.trim().toLowerCase();
+      if (q.length >= 3 && Cloud.ready() && !Cloud.relatedCache.has(q)) {
+        Cloud.related(q).then(r => { Cloud.relatedCache.set(q, r); if (state.filter.q.trim().toLowerCase() === q) { renderFeed(); } }).catch(() => Cloud.relatedCache.set(q, []));
+      }
+    }, 220);
+  });
+  $('#q').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); $('#q').blur(); if (!WIDE()) closePanel(); } if (ev.key === 'Escape') { clearFilter(); } });
+  $('#qClear').onclick = () => { $('#q').value = ''; $('#qClear').hidden = true; state.filter.q = ''; renderFeed(); renderTags(); $('#q').focus(); };
+  $('#tagList').addEventListener('click', ev => { const b = ev.target.closest('[data-tag]'); if (b) setTagFilter(b.dataset.tag); });
+  $('#fbClear').onclick = clearFilter;
+  $('#fbChips').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-unf]'); if (!b) return;
+    if (b.dataset.unf === 'tag') state.filter.tag = null; else { state.filter.q = ''; $('#q').value = ''; $('#qClear').hidden = true; }
+    renderFeed(); renderTags();
+  });
+  $$('#filterbar .seg button').forEach(b => b.onclick = () => { settings.view = b.dataset.view; saveSettings(); renderFeed('top'); });
+
+  // feed actions
+  feed.addEventListener('click', ev => {
+    const t = ev.target.closest('.meta [data-tag]'); if (t) { setTagFilter(t.dataset.tag); return; }
+    const ed = ev.target.closest('[data-edit]'); if (ed) { const e = state.byId.get(ed.closest('article').dataset.id); if (e) enterEdit(e); }
+  });
+
+  // paste & drag-drop images
+  document.addEventListener('paste', ev => {
+    const files = [...(ev.clipboardData && ev.clipboardData.files || [])].filter(f => f.type.startsWith('image/'));
+    if (files.length && !$('#drawDlg').open) { ev.preventDefault(); addImages(files); }
+  });
+  scroller.addEventListener('dragover', ev => { if ([...ev.dataTransfer.types].includes('Files')) { ev.preventDefault(); scroller.classList.add('dropping'); } });
+  scroller.addEventListener('dragleave', () => scroller.classList.remove('dropping'));
+  scroller.addEventListener('drop', ev => { ev.preventDefault(); scroller.classList.remove('dropping'); if (ev.dataTransfer.files.length) addImages(ev.dataTransfer.files); });
+
+  // settings
+  $('#cloudOn').onchange = () => {
+    settings.cloudOn = $('#cloudOn').checked; saveSettings();
+    $('#cloudBox').style.display = settings.cloudOn ? '' : 'none';
+    if (settings.cloudOn && !settings.apiKey) $('#apiKey').focus();
+  };
+  $('#apiKey').onchange = () => { settings.apiKey = $('#apiKey').value.trim(); saveSettings(); };
+  $('#model').onchange = () => { settings.model = $('#model').value; saveSettings(); };
+  $('#keyShow').onclick = () => { const k = $('#apiKey'); const show = k.type === 'password'; k.type = show ? 'text' : 'password'; $('#keyShow').textContent = show ? 'Hide' : 'Show'; };
+  $('#keyTest').onclick = async () => {
+    settings.apiKey = $('#apiKey').value.trim(); saveSettings();
+    const out = $('#keyResult');
+    if (!settings.apiKey) { out.textContent = '⚠ Enter a key first'; return; }
+    out.textContent = '⏳ Testing…';
+    try { const t = await Cloud.tags('Picked up new velvet for Mrs Lee’s armchair, quote was $450.'); out.textContent = '✓ Works. Example tags: ' + t.map(x => '#' + x).join(' '); }
+    catch (err) { out.textContent = '⚠ ' + err.message; }
+  };
+  $('#expMd').onclick = exportMarkdown;
+  $('#expPdf').onclick = exportPdf;
+  $('#ocrPrefetch').onclick = async () => {
+    const b = $('#ocrPrefetch'); b.disabled = true; b.textContent = '⏳ Downloading text reader…';
+    try { await OCR.load(); b.textContent = '✓ Text reader ready offline'; } catch { b.textContent = '⚠ Couldn’t download – check internet'; b.disabled = false; }
+  };
+  $('#reanalyse').onclick = () => {
+    if (!state.entries.length) { toast('No entries yet'); return; }
+    if (!confirm(`Re-read and re-tag all ${state.entries.length} entries? Tags you added or deleted yourself are kept.`)) return;
+    for (const e of state.entries) { e.readRev = null; e.rev++; e.status = 'pending'; Analyser.enqueue(e.id); }
+    renderFeed(); toast('Re-analysing in the background');
+  };
+
+  window.addEventListener('online', () => { for (const e of state.entries) if (e.status === 'waiting' || e.status === 'error') Analyser.enqueue(e.id); });
+  matchMedia('(min-width: 820px)').addEventListener('change', () => {
+    if (WIDE()) { $('#backdrop').classList.remove('show'); $('#panel').classList.toggle('open', settings.panelWide); }
+    else $('#panel').classList.remove('open');
+    updateFilterBar();
+  });
+}
+function updateOrderBtn() {
+  const asc = settings.order === 'asc';
+  $('#orderShort').textContent = asc ? 'Oldest ↑' : 'Newest ↑';
+  $('#orderLong').textContent = asc ? 'Oldest at top' : 'Newest at top';
+  $('#tbOrder').setAttribute('aria-label', 'Timeline order: ' + (asc ? 'oldest at top. Tap for newest at top' : 'newest at top. Tap for oldest at top'));
+}
+
+async function init() {
+  wire(); updateOrderBtn();
+  if (WIDE() && settings.panelWide) $('#panel').classList.add('open');
+  try { await DB.open(); }
+  catch (err) { feed.innerHTML = '<div class="empty"><p><b>⚠ Storage isn’t available.</b></p><p>This browser blocked on-device storage (private window?). Notes can’t be saved.</p></div>'; return; }
+  const all = await DB.all();
+  all.sort((a, b) => a.created - b.created);
+  state.entries = all; for (const e of all) state.byId.set(e.id, e);
+  Corpus.bump();
+  renderFeed(); renderTags();
+  for (const e of all) if (e.status !== 'done') Analyser.enqueue(e.id);
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+init();
+</script>
+</body>
+</html>
